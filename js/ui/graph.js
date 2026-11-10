@@ -17,7 +17,7 @@ function stylesheet() {
   const font = token("--lg-font", "system-ui, sans-serif");
   return [
     { selector: "node", style: { label: "data(label)", color: text, "font-family": font, "font-size": 10, "text-wrap": "wrap",
-      "text-max-width": 140, "min-zoomed-font-size": 7, "text-outline-width": 0 } },
+      "text-max-width": 140, "min-zoomed-font-size": 5, "text-outline-width": 0 } },
     { selector: "node.host", style: { width: 34, height: 34, shape: "ellipse", "background-color": token("--np-node", "#2a3446"),
       "background-image": "data(icon)", "background-fit": "none", "background-width": "60%", "background-height": "60%", "background-position-x": "50%", "background-position-y": "50%", "background-clip": "none", "border-width": 2,
       "border-color": token("--np-group-border", "#556"), "text-valign": "bottom", "text-margin-y": 7, "font-size": 9, "line-height": 1.25 } },
@@ -67,7 +67,10 @@ export function createGraph(container, handlers) {
     const moved = ev.target.isParent() ? ev.target.descendants().filter((n) => !n.isParent()) : ev.target;
     moved.forEach((n) => { const p = n.position(); handlers.onMoved(n.id(), { x: Math.round(p.x), y: Math.round(p.y) }); });
   });
-  window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", () => cy.style(stylesheet()));
+  // re-read the colour tokens when the system theme or a forced data-theme changes
+  const restyle = () => cy.style(stylesheet());
+  window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", restyle);
+  new MutationObserver(restyle).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
   return {
     cy,

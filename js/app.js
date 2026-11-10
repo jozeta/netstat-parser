@@ -223,7 +223,6 @@ async function openSession(file) {
 
 // ---------- DNS ----------
 async function runDns() {
-  const btn = $("dns-btn");
   if (dnsAbort) { dnsAbort.abort(); return; }
   const { resolver, enabled } = state.settings.dns;
   if (!enabled || !resolver) { toast("Enable DNS lookup in Settings first.", "warn"); return; }
@@ -232,7 +231,7 @@ async function runDns() {
   const ips = hosts.map((h) => h.ips[0]).filter((ip) => ip && !(ip in state.dns));
   if (!ips.length) { toast("No unresolved Internet hosts."); return; }
   dnsAbort = new AbortController();
-  btn.textContent = "Cancel DNS";
+  $("dns-label").textContent = "Cancel DNS";
   $("progress").hidden = false;
   const partial = new Map();
   try {
@@ -245,7 +244,7 @@ async function runDns() {
   } finally {
     for (const [ip, name] of partial) state.dns[ip] = name;
     dnsAbort = null;
-    btn.replaceChildren("Resolve DNS");
+    $("dns-label").textContent = "Resolve DNS";
     $("progress").hidden = true;
     setDirty();
     refresh();

@@ -17,8 +17,7 @@ for reference only).
 before building anything.** It holds the goals and non-goals, the input formats, the graph model,
 the UI, settings, exports and the build order. Change the spec first if the behaviour changes.
 
-Status: designed (2026-11-10). Implementation has not started; the starter screen is still the
-scaffold. Update this file as modules land.
+Status (2026-11-10): parsers, model and web UI built; the Python collector is next.
 
 ## Commands
 
@@ -52,16 +51,21 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 - `scripts/gen/`: seeded network generator (`topology.js`) and renderer (`render.js`);
   `scripts/generate-datasets.js` is the CLI
 
-Planned (see the spec):
-- `vendor/cytoscape/`: the graph library, with its licence
-- `js/` pure ES modules (parsers, model, classification, filters, exports), importable in Node
-  without a DOM, plus a thin DOM/Cytoscape layer and a Web Worker for parsing
-- `collector/`: the Python 3 collector
+- `js/app.js`: the controller (state, wiring); `js/worker.js` + `js/worker-core.js`: parsing off
+  the main thread
+- `js/ui/`: `elements.js` (model → Cytoscape JSON, pure, collapse/merge/fade), `layout.js` (pure
+  grouped grid layout), `graph.js` (Cytoscape + style from CSS tokens), `panel.js`, `settings-view.js`,
+  `collect-view.js` (the collect commands), `storage.js` (settings in localStorage), `dom.js`, `icons.js`
+- `vendor/cytoscape-3.34.4/`: Cytoscape.js (MIT). `css/cytoscape-container.css` has the id
+  Cytoscape looks for, so it never injects a `<style>` (blocked by the CSP)
+- Planned: `collector/` (Python 3)
 
 ## Architecture rules
 
 - Logic lives in pure modules with tests, and the UI stays a thin layer on top. Parsing runs in a
-  Web Worker.
+  Web Worker. Cytoscape element IDs contain `: / |`: use `cy.getElementById()`, never `#id` selectors.
+- Risk colours are CSS tokens (`--np-risk-*`, with `--np-*` node/group tokens and `-alpha`
+  companions, because Cytoscape ignores the alpha in `rgba()`); the graph re-reads them on theme change.
 - Every parser produces the same record:
   `{proto, localIp, localPort, remoteIp, remotePort, state, pid?, process?, family}`.
   Formats are auto-detected and never rely on English headers. Windows state names are recognised

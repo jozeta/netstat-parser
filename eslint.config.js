@@ -14,7 +14,7 @@ export default [
   {
     // Pure modules also run in a Web Worker.
     files: ["js/**"],
-    languageOptions: { globals: { TextDecoder: "readonly", self: "readonly", DOMException: "readonly", fetch: "readonly", AbortController: "readonly", Blob: "readonly", Node: "readonly", navigator: "readonly", getComputedStyle: "readonly", Worker: "readonly", requestAnimationFrame: "readonly", clearTimeout: "readonly", location: "readonly" } },
+    languageOptions: { globals: { TextDecoder: "readonly", self: "readonly", DOMException: "readonly", fetch: "readonly", AbortController: "readonly", Blob: "readonly", Node: "readonly", navigator: "readonly", getComputedStyle: "readonly", Worker: "readonly", requestAnimationFrame: "readonly", clearTimeout: "readonly", location: "readonly", MutationObserver: "readonly" } },
   },
   {
     files: ["**/*.test.*", "tests/**", "test/**", "scripts/**"],
