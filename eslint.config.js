@@ -18,6 +18,6 @@ export default [
   },
   {
     files: ["**/*.test.*", "tests/**", "test/**", "scripts/**"],
-    languageOptions: { globals: { process: "readonly", URL: "readonly", TextDecoder: "readonly", TextEncoder: "readonly" } },
+    languageOptions: { globals: { process: "readonly", URL: "readonly", TextDecoder: "readonly", TextEncoder: "readonly", performance: "readonly" } },
   },
 ];

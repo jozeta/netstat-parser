@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "gen:data": "node scripts/generate-datasets.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

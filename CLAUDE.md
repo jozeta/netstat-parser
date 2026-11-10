@@ -31,6 +31,7 @@ Tests:
 ```sh
 npm test            # node --test: tests/*.test.mjs
 npm run lint        # ESLint, including the unsafe-DOM rule
+npm run gen:data    # write synthetic datasets to tests/data/generated/{small,medium,large} (gitignored)
 ```
 
 ## Layout
@@ -38,15 +39,19 @@ npm run lint        # ESLint, including the unsafe-DOM rule
 - `index.html`: entry page (strict CSP, viewport, Låda Glass app shell)
 - `css/app.css`, `js/app.js`: the app's own styles and script (no build step)
 - `vendor/lada-glass/1.1.1/`: the Låda Glass design system (copied; update with claude-check's advice)
-- `tests/`: `node --test` tests
-- `docs/superpowers/specs/`: the design
+- `tests/`: `node --test` tests; `tests/fixtures/` hand-written netstat samples per format (committed)
+- `docs/superpowers/specs/`, `docs/superpowers/plans/`: the design and implementation plans
+- `js/lib/ip.js`: IP/endpoint normalisation (canonical IPv6, IPv4-mapped → IPv4, wildcard `*`)
+- `js/parse/`: `parseFile(name, text)` in `index.js` is the entry point; `decode.js` (bytes → text,
+  UTF-16/code pages), `header.js`, `detect.js` (line-shape scoring), `states.js` (en/sv/de state
+  words, mojibake-tolerant), one parser per format, `common.js` shared helpers, `types.js` typedefs
+- `scripts/gen/`: seeded network generator (`topology.js`) and renderer (`render.js`);
+  `scripts/generate-datasets.js` is the CLI
 
 Planned (see the spec):
 - `vendor/cytoscape/`: the graph library, with its licence
 - `js/` pure ES modules (parsers, model, classification, filters, exports), importable in Node
   without a DOM, plus a thin DOM/Cytoscape layer and a Web Worker for parsing
-- `tests/fixtures/`: small hand-written edge cases (committed)
-- `tests/data/generated/`: synthetic datasets from the seeded generator (gitignored)
 - `collector/`: the Python 3 collector
 
 ## Architecture rules
