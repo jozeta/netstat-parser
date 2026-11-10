@@ -19,3 +19,34 @@
 # Node (tooling only)
 node_modules/
 *.log
+
+# Coverage and test output
+coverage/
+.nyc_output/
+
+# Python (collector)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# --- netstat-parser data: never commit job or client data ---
+# Synthetic datasets are generated (seeded) by the generator script; regenerate instead of committing.
+tests/data/generated/
+# Real collected netstat files, wherever they are dropped (hand-written fixtures are the exception).
+*_netstat.txt
+!tests/fixtures/**
+# Collector output and targets files (targets can hold usernames and NTLM hashes).
+collector/output/
+targets*.txt
+!collector/targets.example.txt
+# App exports: sessions, CSVs, PNGs saved into the repo by mistake.
+*.session.json
+exports/
+connections*.csv
+hosts*.csv
+
+# Local research notes (kept out of git unless asked)
+PRODUCT_RESEARCH_AND_FEATURE_ROADMAP.md
