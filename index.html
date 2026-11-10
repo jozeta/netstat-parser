@@ -4,34 +4,150 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://cloudflare-dns.com https://dns.google https://dns.quad9.net:5053; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="referrer" content="no-referrer">
   <title>netstat-parser</title>
+  <link rel="stylesheet" id="__________cytoscape_stylesheet" href="css/cytoscape-container.css">
   <link rel="stylesheet" href="vendor/lada-glass/1.1.1/lada-glass.css">
   <link rel="stylesheet" href="css/app.css">
-  <script src="js/app.js" defer></script>
+  <script type="module" src="js/app.js"></script>
 </head>
 <body class="lg lg-backdrop">
   <div class="lg-app">
     <nav class="lg-sidebar" aria-label="Main">
-      <div class="lg-brand"><span class="lg-mark"><svg class="lg-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M12 4.5v6M9.5 15h5"/></svg></span>netstat-parser</div>
+      <div class="lg-brand"><span class="lg-mark"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#layers"/></svg></span>netstat-parser</div>
       <div class="lg-nav">
-        <a href="#" aria-current="page"><svg class="lg-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>Overview</a>
-        <a href="#settings"><svg class="lg-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Settings</a>
+        <a href="#graph" data-view="graph" aria-current="page"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#overview"/></svg>Graph</a>
+        <a href="#collect" data-view="collect"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#terminal"/></svg>How to collect</a>
+        <a href="#settings" data-view="settings"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#settings"/></svg>Settings</a>
       </div>
+      <p class="lg-small lg-muted np-privacy"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#lock"/></svg>Files stay in this browser. Nothing is uploaded.</p>
     </nav>
+
     <main class="lg-main">
-      <header class="lg-header">
-        <div>
-          <h1 class="lg-title">netstat-parser</h1>
-          <p class="lg-muted app-lead">webapp that parses multiple netstat files from computers and builds a graph</p>
+      <!-- ============ Graph ============ -->
+      <section id="view-graph" class="np-view" aria-labelledby="graph-title">
+        <header class="lg-header np-header">
+          <h1 class="lg-title" id="graph-title">Network map</h1>
+          <p class="lg-chip" id="job-summary" aria-live="polite">No files loaded</p>
+        </header>
+
+        <div class="lg-card np-toolbar" role="toolbar" aria-label="Graph tools">
+          <label class="lg-btn lg-btn-primary" for="file-input"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#upload"/></svg>Load files</label>
+          <input id="file-input" class="np-visually-hidden" type="file" multiple accept=".txt,.log,text/plain">
+          <label class="lg-btn" for="session-input"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#folder"/></svg>Open session</label>
+          <input id="session-input" class="np-visually-hidden" type="file" accept=".json,application/json">
+          <div class="np-search">
+            <label class="np-visually-hidden" for="search">Search and filter</label>
+            <input id="search" class="lg-input" type="search" placeholder="Search: port:445 risk:red subnet:&quot;Servers&quot; -os:linux" autocomplete="off" spellcheck="false">
+            <button class="lg-btn lg-btn-ghost lg-btn-icon" id="filter-help-btn" type="button" aria-expanded="false" aria-controls="filter-help" title="Filter help"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#info"/></svg><span class="np-visually-hidden">Filter help</span></button>
+          </div>
+          <div class="np-chips" aria-label="Quick filters">
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:red">Vulnerable</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:orange">Exploitable</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="seen:one">One end only</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="collected:no">Not collected</button>
+          </div>
+          <label class="np-inline"><input id="hide-toggle" class="lg-toggle" type="checkbox"> Hide non-matching</label>
+          <div class="np-actions">
+            <button class="lg-btn" id="fit-btn" type="button">Fit</button>
+            <button class="lg-btn" id="collapse-btn" type="button">Collapse all</button>
+            <button class="lg-btn" id="expand-btn" type="button">Expand all</button>
+            <button class="lg-btn" id="relayout-btn" type="button">Re-layout</button>
+            <button class="lg-btn" id="dns-btn" type="button" hidden><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#globe"/></svg>Resolve DNS</button>
+            <div class="np-menu">
+              <button class="lg-btn" id="export-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="export-menu"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#download"/></svg>Export</button>
+              <div class="lg-popup np-menu-list" id="export-menu" role="menu" hidden>
+                <button class="lg-btn lg-btn-ghost" role="menuitem" type="button" data-export="session">Session (.json)</button>
+                <button class="lg-btn lg-btn-ghost" role="menuitem" type="button" data-export="png-view">PNG, current view</button>
+                <button class="lg-btn lg-btn-ghost" role="menuitem" type="button" data-export="png-full">PNG, whole graph</button>
+                <button class="lg-btn lg-btn-ghost" role="menuitem" type="button" data-export="connections">Connections (.csv)</button>
+                <button class="lg-btn lg-btn-ghost" role="menuitem" type="button" data-export="hosts">Hosts (.csv)</button>
+                <button class="lg-btn lg-btn-ghost" role="menuitem" type="button" data-export="targets">Collector targets (.txt)</button>
+              </div>
+            </div>
+          </div>
         </div>
-      </header>
-      <section class="lg-card lg-stack" aria-labelledby="start">
-        <h2 class="lg-subtitle" id="start">Start here</h2>
-        <p class="lg-muted">Replace this card with the first feature. Components: ~/Desktop/code/tools/design/preview.html</p>
-        <p><span class="lg-chip lg-ok" id="status">Ready</span></p>
+
+        <div class="lg-popup np-help" id="filter-help" hidden>
+          <strong>Search and filter</strong>
+          <p class="lg-small lg-muted">Combine terms with spaces; prefix a term with <code class="lg-code">-</code> to exclude it; quote values with spaces.</p>
+          <table class="lg-table lg-small">
+            <tbody>
+              <tr><th scope="row"><code class="lg-code">ip:</code></th><td>address or prefix, <code class="lg-code">ip:10.10.1.</code></td></tr>
+              <tr><th scope="row"><code class="lg-code">host:</code></th><td>hostname contains</td></tr>
+              <tr><th scope="row"><code class="lg-code">port:</code></th><td>service or listening port</td></tr>
+              <tr><th scope="row"><code class="lg-code">proto:</code></th><td>tcp, udp or a protocol name (smb, rdp…)</td></tr>
+              <tr><th scope="row"><code class="lg-code">risk:</code></th><td>red, orange, safe, none</td></tr>
+              <tr><th scope="row"><code class="lg-code">os:</code></th><td>windows, linux, macos, unknown</td></tr>
+              <tr><th scope="row"><code class="lg-code">subnet:</code></th><td>name or CIDR, or internet</td></tr>
+              <tr><th scope="row"><code class="lg-code">state:</code></th><td>established, time_wait, listen…</td></tr>
+              <tr><th scope="row"><code class="lg-code">role:</code></th><td>server, client, both, unknown</td></tr>
+              <tr><th scope="row"><code class="lg-code">tag:</code></th><td>DC, DB, Web, RDP…</td></tr>
+              <tr><th scope="row"><code class="lg-code">collected:</code></th><td>yes or no</td></tr>
+              <tr><th scope="row"><code class="lg-code">seen:</code></th><td>both or one (ends)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="np-work">
+          <div class="lg-card np-graph-card">
+            <div id="graph" class="np-graph" aria-label="Network graph. Use the Hosts list in the panel to navigate with the keyboard." role="img"></div>
+            <div class="lg-empty np-empty" id="empty">
+              <svg aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#upload"/></svg>
+              <strong>Drop netstat files here</strong>
+              <span>or use <em>Load files</em>. Windows, Linux (netstat or ss) and macOS output, as many as you like. <a href="#collect">How to collect them</a>.</span>
+            </div>
+            <div class="np-progress" id="progress" hidden><span class="lg-chip" id="progress-text">Parsing…</span></div>
+            <ul class="np-legend lg-small" aria-label="Legend">
+              <li><span class="np-swatch np-risk-vulnerable"></span>Vulnerable</li>
+              <li><span class="np-swatch np-risk-exploitable"></span>Exploitable / unencrypted</li>
+              <li><span class="np-swatch np-risk-safe"></span>Safe</li>
+              <li><span class="np-swatch np-risk-unclassified"></span>Unclassified</li>
+              <li><span class="np-swatch np-line-one"></span>Seen from one end</li>
+              <li><span class="np-swatch np-host-seen"></span>No file (greyed)</li>
+            </ul>
+          </div>
+
+          <aside class="lg-card np-panel" id="panel" aria-label="Details">
+            <div class="lg-tabs" role="tablist" aria-label="Panel">
+              <button class="lg-tab" role="tab" id="tab-details" aria-selected="true" aria-controls="pane-details" type="button">Details</button>
+              <button class="lg-tab" role="tab" id="tab-hosts" aria-selected="false" aria-controls="pane-hosts" type="button" tabindex="-1">Hosts</button>
+              <button class="lg-tab" role="tab" id="tab-files" aria-selected="false" aria-controls="pane-files" type="button" tabindex="-1">Files</button>
+            </div>
+            <div class="np-pane" id="pane-details" role="tabpanel" aria-labelledby="tab-details" tabindex="0">
+              <p class="lg-muted">Click a host, group or connection to see its details.</p>
+            </div>
+            <div class="np-pane" id="pane-hosts" role="tabpanel" aria-labelledby="tab-hosts" tabindex="0" hidden></div>
+            <div class="np-pane" id="pane-files" role="tabpanel" aria-labelledby="tab-files" tabindex="0" hidden></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ How to collect ============ -->
+      <section id="view-collect" class="np-view lg-stack" aria-labelledby="collect-title" hidden>
+        <header class="lg-header"><h1 class="lg-title" id="collect-title">How to collect</h1></header>
+        <div id="collect-content" class="lg-stack"></div>
+      </section>
+
+      <!-- ============ Settings ============ -->
+      <section id="view-settings" class="np-view lg-stack" aria-labelledby="settings-title" hidden>
+        <header class="lg-header"><h1 class="lg-title" id="settings-title">Settings</h1></header>
+        <div id="settings-content" class="lg-stack"></div>
       </section>
     </main>
+  </div>
+
+  <div class="np-toasts" id="toasts" aria-live="polite"></div>
+  <div class="np-dialog-backdrop" id="dialog" hidden>
+    <div class="lg-popup np-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <strong id="dialog-title">Confirm</strong>
+      <p id="dialog-text" class="lg-muted"></p>
+      <div class="lg-row np-dialog-actions">
+        <button class="lg-btn" id="dialog-cancel" type="button">Cancel</button>
+        <button class="lg-btn lg-btn-primary" id="dialog-ok" type="button">Continue</button>
+      </div>
+    </div>
   </div>
 </body>
 </html>
