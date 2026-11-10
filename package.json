@@ -1,0 +1,16 @@
+{
+  "name": "netstat-parser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "webapp that parses multiple netstat files from computers and builds a graph",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-no-unsanitized": "^4.1.4"
+  }
+}

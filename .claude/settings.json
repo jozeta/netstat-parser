@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git branch:*)", "Bash(ls:*)", "Bash(claude-check:*)", "Bash(python3 -m http.server:*)", "Bash(npm test:*)", "Bash(npm run lint:*)", "Bash(node --test:*)", "Bash(node --check:*)"],
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./**/*.pem)", "Read(./**/*.key)"]
+  }
+}

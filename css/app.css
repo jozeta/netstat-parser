@@ -1,0 +1,3 @@
+/* The app's own styles. Build on the Låda Glass tokens (var(--lg-…)) and lg- components; animate
+   only with --lg-dur-* and keep a prefers-reduced-motion rule for any animation added here. */
+.app-lead { margin: 0; max-width: 60ch; }
