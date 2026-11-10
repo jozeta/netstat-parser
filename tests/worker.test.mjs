@@ -32,3 +32,9 @@ test("files over 50 MB are not parsed", () => {
   assert.equal(r.warnings.notRecognised, true);
   assert.equal(r.warnings.tooLarge, true);
 });
+
+test("a file flagged too large by the page is reported as too large, not as empty", () => {
+  const [r] = handleBatch([{ name: "huge_netstat.txt", bytes: new Uint8Array(0), tooLarge: true }], () => {});
+  assert.equal(r.warnings.tooLarge, true);
+  assert.equal(r.hostname, "huge");
+});

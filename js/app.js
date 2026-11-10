@@ -5,6 +5,8 @@ import { buildModel } from "./model/build.js";
 import { parseQuery, applyFilter } from "./model/filter.js";
 import { connectionsCsv, hostsCsv, targetsFile } from "./model/exports.js";
 import { createSession, parseSession } from "./model/session.js";
+import { mergeSessionSettings } from "./model/settings.js";
+import { MAX_FILE_BYTES } from "./worker-core.js";
 import { resolvePtrs, RESOLVERS } from "./model/dns.js";
 import { toElements } from "./ui/elements.js";
 import { createGraph } from "./ui/graph.js";
@@ -65,7 +67,7 @@ function showView() {
   for (const v of ["graph", "collect", "settings"]) $(`view-${v}`).hidden = v !== known;
   for (const a of document.querySelectorAll(".lg-nav a")) a.toggleAttribute("aria-current", a.dataset.view === known);
   for (const a of document.querySelectorAll(".lg-nav a[aria-current]")) a.setAttribute("aria-current", "page");
-  if (known === "settings") renderSettings($("settings-content"), state.settings, { onSave: applySettings, toast });
+  if (known === "settings") renderSettings($("settings-content"), state.settings, { onSave: applySettings, toast, current: () => state.settings });
   if (known === "collect") renderCollect($("collect-content"), { toast });
   if (known === "graph") requestAnimationFrame(() => graph?.resize());
 }
@@ -96,7 +98,7 @@ function refresh({ relayout = false } = {}) {
   const els = toElements(state.model, { collapsed: state.collapsed, visible: state.visible, mode: state.hide ? "hide" : "fade", dns: state.dns, labels: state.settings.graph.labels });
   graph.render(els, state.positions, { relayout, fit: relayout });
   renderHosts();
-  if (state.selected) showDetails(state.selected);
+  if (state.selected) { graph.select(state.selected, { center: false }); showDetails(state.selected); }
 }
 
 function pick(id) {
@@ -152,18 +154,29 @@ function selectTab(name) {
 // ---------- loading ----------
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 let jobId = 0;
+let generation = 0; // bumped whenever the job is replaced; stale parse results are dropped
+const pending = new Map(); // job id → reject, so a crashed worker never leaves "Parsing…" up
+const failAll = (msg) => { for (const reject of pending.values()) reject(new Error(msg)); pending.clear(); $("progress").hidden = true; };
+worker.addEventListener("error", () => failAll("the parser stopped unexpectedly (file too large or browser out of memory?)"));
+worker.addEventListener("messageerror", () => failAll("the parser sent an unreadable result"));
 
 function parseInWorker(fileList) {
   const id = ++jobId;
-  return Promise.all([...fileList].map((f) => f.arrayBuffer().then((buffer) => ({ name: f.name, buffer }))))
+  $("progress").hidden = false;
+  $("progress-text").textContent = "Reading files…";
+  // files over the worker's limit are sent empty (it reports them as too large) instead of read into memory
+  return Promise.all([...fileList].map((f) => (f.size > MAX_FILE_BYTES ? Promise.resolve(new ArrayBuffer(0)) : f.arrayBuffer())
+    .then((buffer) => ({ name: f.name, buffer, tooLarge: f.size > MAX_FILE_BYTES }))))
     .then((files) => new Promise((resolve, reject) => {
       $("progress").hidden = false;
+      pending.set(id, (err) => { worker.removeEventListener("message", onMsg); reject(err); });
       const onMsg = (ev) => {
         if (ev.data.id !== id) return;
         if (ev.data.type === "progress") $("progress-text").textContent = `Parsing ${ev.data.done} / ${ev.data.total}…`;
         else {
           worker.removeEventListener("message", onMsg);
-          $("progress").hidden = true;
+          pending.delete(id);
+          if (pending.size === 0) $("progress").hidden = true;
           if (ev.data.type === "done") resolve(ev.data.parsed); else reject(new Error(ev.data.message));
         }
       };
@@ -174,9 +187,11 @@ function parseInWorker(fileList) {
 
 async function loadFiles(fileList) {
   if (!fileList?.length) return;
-  const wasEmpty = state.files.length === 0;
+  const gen = generation;
   let parsed;
   try { parsed = await parseInWorker(fileList); } catch (e) { toast(`Could not read the files: ${e.message}`, "bad"); return; }
+  if (gen !== generation) { toast("Files parsed after a session was opened were discarded. Load them again to add them.", "warn"); return; }
+  const wasEmpty = state.files.length === 0;
   const byName = new Map(state.files.map((f) => [f.fileName, f]));
   for (const p of parsed) byName.set(p.fileName, p); // same name → replaced
   state.files = [...byName.values()];
@@ -210,9 +225,11 @@ async function openSession(file) {
   if (state.files.length && !(await confirmDialog("Opening a session replaces the current job. Unsaved changes are lost.", "Open session"))) return;
   try {
     const s = parseSession(await file.text());
-    Object.assign(state, { files: s.files, settings: s.settings, dns: s.dns, positions: s.positions, collapsed: new Set(s.collapsed), selected: null });
-    saveSettings(storage, s.settings);
-    $("dns-btn").hidden = !s.settings.dns.enabled;
+    generation++;
+    // the session's tables apply to this job only: DNS opt-in and the user's internal ranges are kept, nothing is stored
+    const settings = mergeSessionSettings(state.settings, s.settings);
+    Object.assign(state, { files: s.files, settings, dns: s.dns, positions: s.positions, collapsed: new Set(s.collapsed), selected: null });
+    $("dns-btn").hidden = !settings.dns.enabled;
     setDirty(false);
     rebuild();
     toast(`Session opened: ${s.files.length} files.`);
@@ -227,7 +244,8 @@ async function runDns() {
   const { resolver, enabled } = state.settings.dns;
   if (!enabled || !resolver) { toast("Enable DNS lookup in Settings first.", "warn"); return; }
   const sel = state.selected && state.model.hosts.get(state.selected);
-  const hosts = sel && !sel.internal ? [sel] : [...state.model.hosts.values()].filter((h) => !h.internal);
+  if (sel && sel.internal) { toast("The selected host is internal: internal addresses are never sent to a resolver. Deselect it to resolve all Internet hosts.", "warn"); return; }
+  const hosts = sel ? [sel] : [...state.model.hosts.values()].filter((h) => !h.internal);
   const ips = hosts.map((h) => h.ips[0]).filter((ip) => ip && !(ip in state.dns));
   if (!ips.length) { toast("No unresolved Internet hosts."); return; }
   dnsAbort = new AbortController();
@@ -236,11 +254,11 @@ async function runDns() {
   const partial = new Map();
   try {
     const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: dnsAbort.signal, internalRanges: state.settings.internalRanges,
+      onResult: (ip, name) => partial.set(ip, name),
       onProgress: (d, t) => { $("progress-text").textContent = `${RESOLVERS[resolver].label} DNS ${d} / ${t}…`; } });
-    for (const [ip, name] of res) partial.set(ip, name);
     toast(`Resolved ${[...res.values()].filter(Boolean).length} of ${res.size} addresses via ${RESOLVERS[resolver].label}.`);
   } catch (e) {
-    toast(e.name === "AbortError" ? "DNS lookup cancelled." : `DNS lookup failed: ${e.message}`, "warn");
+    toast(e.name === "AbortError" ? `DNS lookup cancelled; ${partial.size} addresses kept.` : `DNS lookup failed: ${e.message}`, "warn");
   } finally {
     for (const [ip, name] of partial) state.dns[ip] = name;
     dnsAbort = null;
@@ -289,9 +307,9 @@ function init() {
     $("filter-help-btn").setAttribute("aria-expanded", String(!h.hidden));
   });
   $("fit-btn").addEventListener("click", () => graph.fit());
-  $("relayout-btn").addEventListener("click", () => { state.positions = {}; refresh({ relayout: true }); });
-  $("collapse-btn").addEventListener("click", () => { state.collapsed = new Set(state.model?.groups.keys() ?? []); refresh(); });
-  $("expand-btn").addEventListener("click", () => { state.collapsed = new Set(); refresh(); });
+  $("relayout-btn").addEventListener("click", () => { state.positions = {}; setDirty(); refresh({ relayout: true }); });
+  $("collapse-btn").addEventListener("click", () => { state.collapsed = new Set(state.model?.groups.keys() ?? []); setDirty(); refresh(); });
+  $("expand-btn").addEventListener("click", () => { state.collapsed = new Set(); setDirty(); refresh(); });
   $("dns-btn").hidden = !state.settings.dns.enabled;
   $("dns-btn").addEventListener("click", runDns);
 

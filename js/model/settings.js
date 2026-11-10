@@ -125,3 +125,17 @@ export function classify(port, proto, settings) {
   }
   return { name: `${port}/${proto}`, risk: "unclassified" };
 }
+
+/**
+ * Settings to use after opening a session: the session's protocol table, subnets and rules apply,
+ * but DNS stays as the user set it (opt-in needs their own acknowledgement) and the user's own
+ * internal ranges are kept (they protect addresses from being sent to a resolver).
+ * @param {typeof DEFAULT_SETTINGS} current
+ * @param {typeof DEFAULT_SETTINGS} fromSession
+ */
+export function mergeSessionSettings(current, fromSession) {
+  const merged = clone(fromSession);
+  merged.dns = clone(current.dns);
+  merged.internalRanges = [...new Set([...current.internalRanges, ...fromSession.internalRanges])];
+  return validateSettings(merged);
+}

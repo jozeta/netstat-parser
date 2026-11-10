@@ -49,7 +49,7 @@ const read = (tr) => Object.fromEntries([...tr.querySelectorAll("[data-k]")].map
  * @param {object} settings current (validated)
  * @param {{onSave: (s: object) => void, toast: (t: string, kind?: string) => void}} handlers
  */
-export function renderSettings(root, settings, { onSave, toast }) {
+export function renderSettings(root, settings, { onSave, toast, current = () => settings }) {
   const protoBody = settings.protocols.map(protocolRow);
   const protoTable = table(["Port", "Proto", "Name", "Risk", ""], protoBody);
   const subnetTable = table(["CIDR", "Name", ""], settings.subnets.map(subnetRow));
@@ -111,7 +111,7 @@ export function renderSettings(root, settings, { onSave, toast }) {
     try {
       const s = validateSettings(JSON.parse(await f.text()));
       onSave(s);
-      renderSettings(root, s, { onSave, toast });
+      renderSettings(root, s, { onSave, toast, current });
       toast("Settings imported.");
     } catch { toast("That file is not valid settings JSON.", "bad"); }
   });
@@ -147,7 +147,7 @@ export function renderSettings(root, settings, { onSave, toast }) {
       el("label", { class: "np-inline", for: "dns-ack" }, ack, "I understand that public IP addresses are sent to this provider.")),
     el("div", { class: "lg-row np-settings-actions" },
       el("button", { class: "lg-btn lg-btn-primary", type: "button", onclick: save }, "Save settings"),
-      el("button", { class: "lg-btn", type: "button", onclick: () => { onSave(validateSettings(DEFAULT_SETTINGS)); renderSettings(root, validateSettings(DEFAULT_SETTINGS), { onSave, toast }); toast("Settings reset to defaults."); } }, "Reset to defaults"),
-      el("button", { class: "lg-btn", type: "button", onclick: () => download("netstat-parser-settings.json", JSON.stringify(settings, null, 2), "application/json") }, "Export settings"),
+      el("button", { class: "lg-btn", type: "button", onclick: () => { onSave(validateSettings(DEFAULT_SETTINGS)); renderSettings(root, validateSettings(DEFAULT_SETTINGS), { onSave, toast, current }); toast("Settings reset to defaults."); } }, "Reset to defaults"),
+      el("button", { class: "lg-btn", type: "button", onclick: () => download("netstat-parser-settings.json", JSON.stringify(current(), null, 2), "application/json") }, "Export settings"),
       el("label", { class: "lg-btn", for: "settings-import" }, "Import settings"), importInput));
 }

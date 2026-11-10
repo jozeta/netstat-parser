@@ -5,7 +5,7 @@ import { osIcon, OS_LIST } from "./icons.js";
 
 const token = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
-function stylesheet() {
+function stylesheet(large = false) {
   const risk = {
     vulnerable: token("--np-risk-vulnerable", "#ff5d5d"),
     exploitable: token("--np-risk-exploitable", "#ffa23a"),
@@ -37,7 +37,7 @@ function stylesheet() {
     { selector: "node.collapsed", style: { width: 96, height: 52, "text-valign": "center", "font-size": 11, "text-max-width": 90 } },
     { selector: "node.collapsed.internet", style: { shape: "ellipse", width: 120, height: 64 } },
     { selector: "edge", style: { width: 1.6, "line-color": risk.unclassified, "target-arrow-color": risk.unclassified,
-      "target-arrow-shape": "triangle", "arrow-scale": 0.7, "curve-style": "bezier", opacity: 0.9 } },
+      "target-arrow-shape": "triangle", "arrow-scale": 0.7, "curve-style": large ? "haystack" : "bezier", opacity: 0.9 } },
     ...Object.entries(risk).map(([r, c]) => ({ selector: `edge.risk-${r}`, style: { "line-color": c, "target-arrow-color": c } })),
     { selector: "edge.merged", style: { width: "mapData(count, 1, 40, 2, 7)", label: "data(label)", "font-size": 9, color: text,
       "text-rotation": "autorotate", "text-background-opacity": 0 } },
@@ -68,7 +68,8 @@ export function createGraph(container, handlers) {
     moved.forEach((n) => { const p = n.position(); handlers.onMoved(n.id(), { x: Math.round(p.x), y: Math.round(p.y) }); });
   });
   // re-read the colour tokens when the system theme or a forced data-theme changes
-  const restyle = () => cy.style(stylesheet());
+  let large = false;
+  const restyle = () => cy.style(stylesheet(large));
   window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", restyle);
   new MutationObserver(restyle).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
@@ -77,7 +78,7 @@ export function createGraph(container, handlers) {
     /** Replace all elements. Saved positions win unless relayout; others come from the grouped layout. */
     render(els, positions, { relayout = false, fit = false } = {}) {
       const { nodes, edges } = els;
-      const large = nodes.length + edges.length > 3000;
+      const isLarge = nodes.length + edges.length > 3000;
       const computed = groupedLayout(els);
       const hadNodes = cy.nodes().length > 0;
       cy.startBatch();
@@ -88,7 +89,8 @@ export function createGraph(container, handlers) {
         if (p) n.position(p);
       });
       cy.endBatch();
-      cy.style().selector("edge").style("curve-style", large ? "haystack" : "bezier").update();
+      // only rebuild the stylesheet when the size class changes (appending rules every render leaks)
+      if (isLarge !== large) { large = isLarge; restyle(); }
       if (fit || relayout || !hadNodes) cy.fit(undefined, 30);
       return Promise.resolve();
     },
@@ -97,11 +99,11 @@ export function createGraph(container, handlers) {
       cy.nodes().filter((n) => !n.isParent()).forEach((n) => { const p = n.position(); out[n.id()] = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }; });
       return out;
     },
-    select(id) {
+    select(id, { center = true } = {}) {
       cy.$(":selected").unselect();
       if (!id) return;
       const n = cy.getElementById(id);
-      if (n.nonempty()) { n.select(); cy.animate({ center: { eles: n } }, { duration: reducedMotion() ? 0 : 250 }); }
+      if (n.nonempty()) { n.select(); if (center) cy.animate({ center: { eles: n } }, { duration: reducedMotion() ? 0 : 250 }); }
     },
     fit() { cy.fit(undefined, 30); },
     resize() { cy.resize(); },

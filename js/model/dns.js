@@ -38,10 +38,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * @param {string[]} ips
  * @param {{resolver: string, fetch: Function, concurrency?: number, delayMs?: number, signal?: AbortSignal,
- *   onProgress?: (done: number, total: number) => void, internalRanges?: string[]}} opts
+ *   onProgress?: (done: number, total: number) => void, onResult?: (ip: string, name: string|null) => void,
+ *   internalRanges?: string[]}} opts
  * @returns {Promise<Map<string, string|null>>}
  */
-export async function resolvePtrs(ips, { resolver, fetch, concurrency = 4, delayMs = 100, signal, onProgress, internalRanges = [] }) {
+export async function resolvePtrs(ips, { resolver, fetch, concurrency = 4, delayMs = 100, signal, onProgress, onResult, internalRanges = [] }) {
   const r = RESOLVERS[resolver];
   if (!Object.hasOwn(RESOLVERS, resolver) || !r) throw new Error("Unknown resolver");
   // Privacy: only public addresses ever leave the browser (settings' internal ranges included).
@@ -62,6 +63,7 @@ export async function resolvePtrs(ips, { resolver, fetch, concurrency = 4, delay
         if (signal?.aborted || e?.name === "AbortError") throw abortError();
       }
       out.set(ip, name);
+      onResult?.(ip, name); // reported as it arrives, so a cancelled run keeps what it got
       onProgress?.(++done, queue.length);
       if (delayMs) await sleep(delayMs);
     }
