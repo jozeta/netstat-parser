@@ -8,13 +8,14 @@ const END = "### netstat";
 const MAX_HEADER_LINES = 50;
 
 /**
- * Remove control characters, trim, and cap the length.
+ * Remove control, bidi and zero-width characters, trim, and cap the length.
  * @param {string} s
  * @param {number} max
  */
 export function cleanText(s, max) {
+  // also bidi overrides and zero-width characters, which can spoof how a name is displayed
   // eslint-disable-next-line no-control-regex -- stripping control characters is the point
-  return String(s).replace(/[\u0000-\u001f\u007f-\u009f]/g, "").trim().slice(0, max).trim();
+  return String(s).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "").trim().slice(0, max).trim();
 }
 
 function parseAddresses(value) {

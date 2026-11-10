@@ -71,9 +71,9 @@ function formatV6(groups) {
 export function normalizeIp(text) {
   if (typeof text !== "string") return null;
   let s = text.trim();
-  if (s === "*") return { ip: "*", family: 4 };
   const pct = s.indexOf("%");
   if (pct >= 0) s = s.slice(0, pct);
+  if (s === "*") return { ip: "*", family: 4 };
   if (s.length === 0 || s.length > 45) return null;
   const v4 = parseV4(s);
   if (v4) return { ip: v4.every((n) => n === 0) ? "*" : v4.join("."), family: 4 };
@@ -106,10 +106,11 @@ export function splitEndpoint(token, sep) {
   if (typeof token !== "string") return null;
   let host, portText;
   if (sep === ":" && token.startsWith("[")) {
-    const close = token.indexOf("]");
-    if (close < 0 || token[close + 1] !== ":") return null;
-    host = token.slice(1, close);
-    portText = token.slice(close + 2);
+    // "[addr]:port", or ss's "[addr]%iface:port"
+    const m = /^\[([^\]]+)\](?:%[^:\s]*)?:([^:]+)$/.exec(token);
+    if (!m) return null;
+    host = m[1];
+    portText = m[2];
   } else {
     const at = token.lastIndexOf(sep);
     if (at <= 0) return null;

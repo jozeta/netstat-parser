@@ -7,12 +7,20 @@ import { splitLines, isCandidate, createResult, makeRecord, addProcess } from ".
 
 const PID_PROG = /^(\d+)\/(.*)$/;
 
+// Without -W, net-tools cuts an address so that address + port is at most 22 characters, which
+// for IPv6 can leave a different but valid address. Flag endpoints that hit that limit exactly.
+function mayBeTruncated(token) {
+  // IPv6 (two or more colons) and exactly "22 characters + ':'" long
+  return token.length === 23 && token.indexOf(":") !== token.lastIndexOf(":");
+}
+
 /**
  * @param {string} body
  * @returns {import('./types.js').FormatResult}
  */
 export function parseLinuxNetstat(body) {
   const res = createResult();
+  let truncated = 0;
   splitLines(body).forEach((line, idx) => {
     const tokens = line.trim().split(/\s+/);
     if (!isCandidate(tokens)) return;
@@ -25,9 +33,10 @@ export function parseLinuxNetstat(body) {
     if (rest.length && rest[0] !== "-" && !PID_PROG.test(rest[0])) { stateWord = rest[0]; rest = rest.slice(1); }
     const rec = makeRecord(tokens[0], local, remote, stateWord, res.unknown);
     if (!rec) { res.addUnparsed(idx + 1, line); return; }
+    if (mayBeTruncated(tokens[3]) || mayBeTruncated(tokens[4])) truncated++;
     const m = PID_PROG.exec(rest.join(" "));
     if (m) addProcess(rec, m[1], m[2]);
     res.records.push(rec);
   });
-  return res.finish();
+  return { ...res.finish(), truncated };
 }

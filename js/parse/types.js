@@ -12,7 +12,7 @@
 /**
  * @typedef {{ fileName: string, format: Format|null, hostname: string, hostnameSource: 'header'|'filename',
  *   header: Header|null, records: NetRecord[], warnings: { unparsedCount: number,
- *   unparsedSamples: {lineNo: number, line: string}[], unknownStates: string[], notRecognised: boolean } }} ParsedFile
+ *   unparsedSamples: {lineNo: number, line: string}[], unknownStates: string[], notRecognised: boolean, truncatedAddresses: number } }} ParsedFile
  */
 
 export const STATES = Object.freeze([

@@ -1,6 +1,6 @@
 // Entry point: one netstat file (already decoded to text) → ParsedFile.
 
-import { parseHeader, hostnameFromFileName } from "./header.js";
+import { parseHeader, hostnameFromFileName, cleanText } from "./header.js";
 import { detectFormat } from "./detect.js";
 import { parseWindows } from "./windows.js";
 import { parseLinuxNetstat } from "./linux-netstat.js";
@@ -26,7 +26,7 @@ export function parseFile(fileName, text) {
   const result = format ? PARSERS[format](body) : { records: [], unparsed: [], unknownStates: [] };
   const fromHeader = header?.hostname;
   return {
-    fileName: String(fileName),
+    fileName: cleanText(String(fileName), 255) || "unnamed",
     format,
     hostname: fromHeader || hostnameFromFileName(fileName),
     hostnameSource: fromHeader ? "header" : "filename",
@@ -37,6 +37,7 @@ export function parseFile(fileName, text) {
       unparsedSamples: result.unparsed.slice(0, MAX_SAMPLES),
       unknownStates: result.unknownStates,
       notRecognised: format === null || result.records.length === 0,
+      truncatedAddresses: result.truncated ?? 0,
     },
   };
 }
