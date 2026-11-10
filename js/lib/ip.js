@@ -133,3 +133,31 @@ export function isWildcard(ip) {
 export function isLoopback(ip) {
   return ip === "::1" || /^127\./.test(ip);
 }
+
+/**
+ * Numeric value of an address (for CIDR math).
+ * @param {string} text
+ * @returns {{value: bigint, family: 4|6} | null}
+ */
+export function ipToBigInt(text) {
+  if (typeof text !== "string") return null;
+  const s = text.trim().split("%")[0];
+  const v4 = parseV4(s);
+  if (v4) return { value: v4.reduce((a, n) => (a << 8n) | BigInt(n), 0n), family: 4 };
+  if (!s.includes(":")) return null;
+  const g = parseV6(s);
+  if (!g) return null;
+  return { value: g.reduce((a, n) => (a << 16n) | BigInt(n), 0n), family: 6 };
+}
+
+/**
+ * @param {bigint} value
+ * @param {4|6} family
+ * @returns {string} canonical text
+ */
+export function bigIntToIp(value, family) {
+  if (family === 4) return [24n, 16n, 8n, 0n].map((sh) => Number((value >> sh) & 255n)).join(".");
+  const groups = [];
+  for (let i = 7; i >= 0; i--) groups.push(Number((value >> BigInt(i * 16)) & 0xffffn));
+  return formatV6(groups);
+}
