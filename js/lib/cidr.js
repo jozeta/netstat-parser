@@ -41,3 +41,7 @@ export function networkOf(ip, prefix) {
   if (!a) return null;
   return `${bigIntToIp(a.value & mask(prefix, a.family), a.family)}/${prefix}`;
 }
+
+/** Private, link-local, CGNAT and ULA ranges: everything else counts as Internet. */
+export const DEFAULT_INTERNAL_RANGES = Object.freeze(
+  ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "fe80::/10", "fc00::/7"].map(parseCidr));

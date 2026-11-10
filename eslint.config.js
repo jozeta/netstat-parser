@@ -14,10 +14,10 @@ export default [
   {
     // Pure modules also run in a Web Worker.
     files: ["js/**"],
-    languageOptions: { globals: { TextDecoder: "readonly", self: "readonly" } },
+    languageOptions: { globals: { TextDecoder: "readonly", self: "readonly", DOMException: "readonly", fetch: "readonly", AbortController: "readonly" } },
   },
   {
     files: ["**/*.test.*", "tests/**", "test/**", "scripts/**"],
-    languageOptions: { globals: { process: "readonly", URL: "readonly", TextDecoder: "readonly", TextEncoder: "readonly", performance: "readonly" } },
+    languageOptions: { globals: { process: "readonly", URL: "readonly", TextDecoder: "readonly", TextEncoder: "readonly", performance: "readonly", AbortController: "readonly", DOMException: "readonly" } },
   },
 ];

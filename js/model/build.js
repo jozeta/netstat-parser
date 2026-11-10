@@ -1,11 +1,10 @@
 // ParsedFile[] → graph model (hosts, subnet / Internet groups, edges). Pure and deterministic;
 // rebuilt on every change. IDs are stable so the UI can keep positions and collapse state.
 
-import { parseCidr, inCidr, networkOf } from "../lib/cidr.js";
+import { parseCidr, inCidr, networkOf, DEFAULT_INTERNAL_RANGES } from "../lib/cidr.js";
 import { isLoopback } from "../lib/ip.js";
 import { classify } from "./settings.js";
 
-const INTERNAL_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "fe80::/10", "fc00::/7"].map(parseCidr);
 const LINK_LOCAL = ["169.254.0.0/16", "fe80::/10"].map(parseCidr);
 
 const isLinkLocal = (ip) => LINK_LOCAL.some((c) => inCidr(ip, c));
@@ -37,7 +36,7 @@ function newHost(id, { hostname = null, ip = null, collected, internal }) {
  * @param {object} settings validated settings
  */
 export function buildModel(files, settings) {
-  const internalRanges = [...INTERNAL_RANGES, ...settings.internalRanges.map(parseCidr).filter(Boolean)];
+  const internalRanges = [...DEFAULT_INTERNAL_RANGES, ...settings.internalRanges.map(parseCidr).filter(Boolean)];
   const named = settings.subnets.map((s) => ({ cidr: parseCidr(s.cidr), name: s.name })).filter((s) => s.cidr)
     .sort((a, b) => b.cidr.prefix - a.cidr.prefix);
   const isInternal = (ip) => internalRanges.some((c) => inCidr(ip, c));

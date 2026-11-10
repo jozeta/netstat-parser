@@ -45,6 +45,10 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 - `js/parse/`: `parseFile(name, text)` in `index.js` is the entry point; `decode.js` (bytes → text,
   UTF-16/code pages), `header.js`, `detect.js` (line-shape scoring), `states.js` (en/sv/de state
   words, mojibake-tolerant), one parser per format, `common.js` shared helpers, `types.js` typedefs
+- `js/lib/cidr.js`: CIDR math and the default internal ranges
+- `js/model/`: `build.js` (`buildModel(files, settings)` → hosts/groups/edges), `settings.js`
+  (defaults, `validateSettings`, `classify`), `filter.js` (`parseQuery`, `applyFilter`), `exports.js`
+  (CSV, targets), `session.js` (save/open, untrusted import), `dns.js` (DoH PTR, injected fetch)
 - `scripts/gen/`: seeded network generator (`topology.js`) and renderer (`render.js`);
   `scripts/generate-datasets.js` is the CLI
 
