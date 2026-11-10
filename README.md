@@ -33,6 +33,7 @@ next. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/
   edit the role rules.
 - **Optional DNS lookup** for Internet addresses via DNS-over-HTTPS (Cloudflare, Google or Quad9).
   It's off by default, and the app warns you before sending anything.
+- **Dark and light themes:** follows your system, or pick Dark or Light in the sidebar.
 - **Exports:**
   - PNG
   - a saved session (`.json`) you can reopen later

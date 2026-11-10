@@ -44,3 +44,9 @@ test("no inline styles or inline scripts", () => {
   assert.doesNotMatch(html, /\sstyle="/);
   assert.doesNotMatch(html, /<script(?![^>]*\ssrc=)[^>]*>/);
 });
+
+test("saved theme applies before first paint and there is a System/Dark/Light switch", () => {
+  const boot = html.indexOf('<script src="js/theme-boot.js"></script>');
+  assert.ok(boot > 0 && boot < html.indexOf('rel="stylesheet"'));
+  for (const t of ["system", "dark", "light"]) assert.match(html, new RegExp(`role="radio" data-theme-choice="${t}"`));
+});

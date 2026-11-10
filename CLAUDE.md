@@ -56,6 +56,9 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 - `js/ui/`: `elements.js` (model → Cytoscape JSON, pure, collapse/merge/fade), `layout.js` (pure
   grouped grid layout), `graph.js` (Cytoscape + style from CSS tokens), `panel.js`, `settings-view.js`,
   `collect-view.js` (the collect commands), `storage.js` (settings in localStorage), `dom.js`, `icons.js`
+- `js/theme-boot.js`: tiny classic script in `<head>` that applies the saved theme before paint;
+  `js/ui/theme.js` holds the switch logic (key `netstat-parser.theme`; a per-browser convenience)
+- `js/model/files.js`: unique file names within a batch or session
 - `vendor/cytoscape-3.34.4/`: Cytoscape.js (MIT). `css/cytoscape-container.css` has the id
   Cytoscape looks for, so it never injects a `<style>` (blocked by the CSP)
 - Planned: `collector/` (Python 3)

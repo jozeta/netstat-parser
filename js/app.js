@@ -10,11 +10,13 @@ import { MAX_FILE_BYTES } from "./worker-core.js";
 import { resolvePtrs, RESOLVERS } from "./model/dns.js";
 import { toElements } from "./ui/elements.js";
 import { createGraph } from "./ui/graph.js";
-import { hostDetails, groupDetails, edgeDetails, mergedDetails, hostsList, filesList } from "./ui/panel.js";
+import { hostDetails, groupDetails, edgeDetails, mergedDetails, hostsList, groupsList, filesList } from "./ui/panel.js";
 import { el, replace, download } from "./ui/dom.js";
 import { loadSettings, saveSettings } from "./ui/storage.js";
 import { renderSettings } from "./ui/settings-view.js";
 import { renderCollect } from "./ui/collect-view.js";
+import { readTheme, writeTheme, applyTheme } from "./ui/theme.js";
+import { uniqueFileNames } from "./model/files.js";
 
 const $ = (id) => document.getElementById(id);
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
@@ -42,18 +44,33 @@ function toast(text, kind = "ok", ms = 6000) {
   setTimeout(() => t.remove(), ms);
 }
 
+let dialogOpen = false;
 function confirmDialog(text, okLabel = "Continue") {
+  if (dialogOpen) return Promise.resolve(false); // one question at a time
+  dialogOpen = true;
   return new Promise((resolve) => {
-    const d = $("dialog");
+    const d = $("dialog"), ok = $("dialog-ok"), cancel = $("dialog-cancel");
+    const opener = document.activeElement;
     $("dialog-text").textContent = text;
-    $("dialog-ok").textContent = okLabel;
+    ok.textContent = okLabel;
     d.hidden = false;
-    $("dialog-ok").focus();
-    const done = (v) => { d.hidden = true; $("dialog-ok").onclick = $("dialog-cancel").onclick = null; document.removeEventListener("keydown", esc); resolve(v); };
-    const esc = (ev) => { if (ev.key === "Escape") done(false); };
-    document.addEventListener("keydown", esc);
-    $("dialog-ok").onclick = () => done(true);
-    $("dialog-cancel").onclick = () => done(false);
+    ok.focus();
+    const done = (v) => {
+      d.hidden = true;
+      ok.onclick = cancel.onclick = null;
+      document.removeEventListener("keydown", keys, true);
+      dialogOpen = false;
+      if (opener instanceof HTMLElement && document.contains(opener)) opener.focus();
+      resolve(v);
+    };
+    // modal: Escape cancels, Tab cycles between the two buttons only
+    const keys = (ev) => {
+      if (ev.key === "Escape") { ev.preventDefault(); done(false); }
+      if (ev.key === "Tab") { ev.preventDefault(); (document.activeElement === ok ? cancel : ok).focus(); }
+    };
+    document.addEventListener("keydown", keys, true);
+    ok.onclick = () => done(true);
+    cancel.onclick = () => done(false);
   });
 }
 
@@ -133,7 +150,18 @@ function toggleGroup(id) {
   refresh();
 }
 
-function renderHosts() { replace($("pane-hosts"), hostsList({ model: state.model, visible: state.visible, onPick: pick })); }
+let groupsOpen = false;
+// keep keyboard focus on the same toggle after the list re-renders
+function toggleGroupFromList(id) {
+  toggleGroup(id);
+  document.querySelector(`#pane-hosts [data-group="${CSS.escape(id)}"]`)?.focus();
+}
+
+function renderHosts() {
+  replace($("pane-hosts"),
+    groupsList({ model: state.model, collapsed: state.collapsed, onToggle: toggleGroupFromList, onPick: pick, open: groupsOpen, onOpenChange: (v) => { groupsOpen = v; } }),
+    hostsList({ model: state.model, visible: state.visible, onPick: pick }));
+}
 function renderFiles() { replace($("pane-files"), filesList({ files: state.files, onRemove: removeFile })); }
 
 function removeFile(name) {
@@ -172,7 +200,7 @@ function parseInWorker(fileList) {
       pending.set(id, (err) => { worker.removeEventListener("message", onMsg); reject(err); });
       const onMsg = (ev) => {
         if (ev.data.id !== id) return;
-        if (ev.data.type === "progress") $("progress-text").textContent = `Parsing ${ev.data.done} / ${ev.data.total}…`;
+        if (ev.data.type === "progress") $("progress-text").textContent = `Parsing ${ev.data.done} / ${ev.data.total}…${pending.size > 1 ? ` (${pending.size - 1} more batch${pending.size > 2 ? "es" : ""} waiting)` : ""}`;
         else {
           worker.removeEventListener("message", onMsg);
           pending.delete(id);
@@ -192,6 +220,7 @@ async function loadFiles(fileList) {
   try { parsed = await parseInWorker(fileList); } catch (e) { toast(`Could not read the files: ${e.message}`, "bad"); return; }
   if (gen !== generation) { toast("Files parsed after a session was opened were discarded. Load them again to add them.", "warn"); return; }
   const wasEmpty = state.files.length === 0;
+  uniqueFileNames(parsed.map((p) => p.fileName)).forEach((name, i) => { parsed[i].fileName = name; });
   const byName = new Map(state.files.map((f) => [f.fileName, f]));
   for (const p of parsed) byName.set(p.fileName, p); // same name → replaced
   state.files = [...byName.values()];
@@ -325,20 +354,46 @@ function init() {
     if (ev.key === "ArrowUp") { ev.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
   });
   document.addEventListener("click", (ev) => { if (!menu.hidden && !ev.target.closest(".np-menu")) setMenu(false); });
+  // tabbing out of the menu closes it
+  menu.addEventListener("focusout", (ev) => { if (!menu.contains(ev.relatedTarget) && ev.relatedTarget !== $("export-btn")) setMenu(false); });
 
   const tabs = ["details", "hosts", "files"];
   for (const t of tabs) {
     $(`tab-${t}`).addEventListener("click", () => selectTab(t));
     $(`tab-${t}`).addEventListener("keydown", (ev) => {
       const i = tabs.indexOf(t);
-      const next = ev.key === "ArrowRight" ? tabs[(i + 1) % 3] : ev.key === "ArrowLeft" ? tabs[(i + 2) % 3] : null;
+      const next = ev.key === "ArrowRight" ? tabs[(i + 1) % 3] : ev.key === "ArrowLeft" ? tabs[(i + 2) % 3]
+        : ev.key === "Home" ? tabs[0] : ev.key === "End" ? tabs[2] : null;
       if (next) { selectTab(next); $(`tab-${next}`).focus(); }
     });
   }
   window.addEventListener("resize", () => graph.resize());
+  initTheme();
   state.model = buildModel([], state.settings);
   rebuild();
   showView();
+}
+
+function initTheme() {
+  const radios = [...document.querySelectorAll("[data-theme-choice]")];
+  const set = (choice, focus = false) => {
+    applyTheme(choice);
+    writeTheme(storage, choice);
+    for (const r of radios) {
+      const on = r.dataset.themeChoice === choice;
+      r.setAttribute("aria-checked", String(on));
+      r.tabIndex = on ? 0 : -1;
+      if (on && focus) r.focus();
+    }
+  };
+  set(readTheme(storage));
+  radios.forEach((r, i) => {
+    r.addEventListener("click", () => set(r.dataset.themeChoice));
+    r.addEventListener("keydown", (ev) => {
+      const d = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : ev.key === "ArrowLeft" || ev.key === "ArrowUp" ? -1 : 0;
+      if (d) { ev.preventDefault(); set(radios[(i + d + radios.length) % radios.length].dataset.themeChoice, true); }
+    });
+  });
 }
 
 function syncQuick() {

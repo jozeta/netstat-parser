@@ -59,10 +59,17 @@
   clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .np-view { min-width: 0; }
 .np-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--lg-space-s); }
+.np-theme { display: grid; gap: var(--lg-space-xxs); padding: 0 var(--lg-space-s); }
+.np-theme .lg-tabs { display: flex; width: 100%; box-sizing: border-box; }
+.np-theme .lg-tab { flex: 1; padding: 4px 6px; }
+.np-theme .lg-tab[aria-checked="true"] { background: var(--lg-glass-strong); color: var(--lg-text); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
+.np-group-row { display: flex; gap: var(--lg-space-xxs); align-items: center; }
+.np-group-row > .lg-btn:first-child { flex: 1; justify-content: space-between; }
 .np-privacy { display: flex; gap: var(--lg-space-xs); align-items: flex-start; margin-top: auto; padding: var(--lg-space-s); }
 
 /* ---- toolbar ---- */
-.np-toolbar { display: flex; flex-wrap: wrap; gap: var(--lg-space-s); align-items: center; padding: var(--lg-space-s); margin-bottom: var(--lg-space-s); }
+/* above the graph card, so the Export menu is never drawn underneath it */
+.np-toolbar { position: relative; z-index: 10; display: flex; flex-wrap: wrap; gap: var(--lg-space-s); align-items: center; padding: var(--lg-space-s); margin-bottom: var(--lg-space-s); }
 .np-search { display: flex; gap: var(--lg-space-xxs); align-items: center; flex: 1 1 260px; min-width: 0; }
 .np-search .lg-input { flex: 1; min-width: 0; }
 .np-chips, .np-actions { display: flex; flex-wrap: wrap; gap: var(--lg-space-xxs); }
@@ -70,6 +77,8 @@
 .np-inline { display: inline-flex; gap: var(--lg-space-xs); align-items: center; }
 .np-menu { position: relative; }
 .np-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 240px; display: grid; gap: 2px; padding: var(--lg-space-xs); }
+/* solid, not glass: it opens over a busy graph */
+.np-menu-list, .np-help { background: var(--lg-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .np-menu-list .lg-btn { justify-content: flex-start; width: 100%; }
 .np-help { position: relative; z-index: 15; width: min(520px, 100%); margin-bottom: var(--lg-space-s); }
 .np-help th { white-space: nowrap; }
@@ -141,7 +150,12 @@
   .np-privacy { display: none; }
   .np-legend { position: static; margin: var(--lg-space-s); }
   .np-graph-card { display: flex; flex-direction: column; justify-content: flex-end; }
-  .np-menu-list { right: auto; left: 0; }
+  /* the menu spans the toolbar instead of hanging off the Export button (no sideways scroll) */
+  .np-menu { position: static; }
+  .np-menu-list { left: var(--lg-space-s); right: var(--lg-space-s); top: auto; width: auto; }
+  .lg-sidebar { flex-wrap: wrap; }
+  .np-theme { flex-basis: 100%; display: flex; align-items: center; gap: var(--lg-space-s); padding: 0 var(--lg-space-xs); }
+  .np-theme .lg-tabs { width: auto; flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }

@@ -98,6 +98,17 @@ export function mergedDetails({ model, ids, label, onPick }) {
   ];
 }
 
+export function groupsList({ model, collapsed, onToggle, onPick, open = false, onOpenChange = () => {} }) {
+  const groups = [...model.groups.values()].sort((a, b) => Number(a.kind === "internet") - Number(b.kind === "internet") || a.name.localeCompare(b.name));
+  if (!groups.length) return null;
+  const details = el("details", { class: "np-groups", open }, el("summary", null, `Groups (${groups.length})`),
+    el("ul", { class: "np-list" }, groups.map((g) => el("li", { class: "np-group-row" },
+      el("button", { class: "lg-btn lg-btn-ghost", type: "button", onclick: () => onPick(g.id) }, el("span", null, g.name), el("span", { class: "np-sub" }, `${g.hostIds.length} hosts`)),
+      el("button", { class: "lg-btn", type: "button", "aria-label": `${collapsed.has(g.id) ? "Expand" : "Collapse"} ${g.name}`, "data-group": g.id, onclick: () => onToggle(g.id) }, collapsed.has(g.id) ? "Expand" : "Collapse")))));
+  details.addEventListener("toggle", () => onOpenChange(details.open));
+  return details;
+}
+
 export function hostsList({ model, visible, onPick }) {
   const hosts = [...model.hosts.values()].filter((h) => !visible || visible.hosts.has(h.id)).sort((a, b) => Number(b.collected) - Number(a.collected) || a.label.localeCompare(b.label));
   return [
