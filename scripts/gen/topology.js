@@ -143,7 +143,7 @@ export function buildNetwork(size, seed) {
     h.sockets.push(rec);
   };
   const listen = (h, port, proto, proc, { v6 = true, bindIp = "*" } = {}) => {
-    const remotePort = h.os === "windows" && proto === "tcp" ? 0 : null;
+    const remotePort = null; // a wildcard remote has no port (Windows prints it as :0)
     const state = proto === "tcp" ? "LISTEN" : "BOUND";
     push(h, { proto, family: 4, localIp: bindIp, localPort: port, remoteIp: "*", remotePort, state }, proc);
     if (v6 && bindIp === "*") push(h, { proto, family: 6, localIp: "*", localPort: port, remoteIp: "*", remotePort, state }, proc);

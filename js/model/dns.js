@@ -31,7 +31,8 @@ export function parsePtrAnswer(json) {
 }
 
 // never resolvable on the public Internet, or not unicast
-const NOT_PUBLIC = ["0.0.0.0/8", "224.0.0.0/4", "240.0.0.0/4", "ff00::/8"].map(parseCidr);
+// plus IPv6 forms that embed an IPv4 address (NAT64, 6to4, Teredo), which may hide a private one
+const NOT_PUBLIC = ["0.0.0.0/8", "224.0.0.0/4", "240.0.0.0/4", "ff00::/8", "64:ff9b::/96", "64:ff9b:1::/48", "2002::/16", "2001::/32"].map(parseCidr);
 const abortError = () => new DOMException("Aborted", "AbortError");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

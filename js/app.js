@@ -253,7 +253,7 @@ async function runDns() {
   $("progress").hidden = false;
   const partial = new Map();
   try {
-    const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: dnsAbort.signal, internalRanges: state.settings.internalRanges,
+    const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: dnsAbort.signal, internalRanges: [...state.settings.internalRanges, ...state.settings.subnets.map((s) => s.cidr)],
       onResult: (ip, name) => partial.set(ip, name),
       onProgress: (d, t) => { $("progress-text").textContent = `${RESOLVERS[resolver].label} DNS ${d} / ${t}…`; } });
     toast(`Resolved ${[...res.values()].filter(Boolean).length} of ${res.size} addresses via ${RESOLVERS[resolver].label}.`);

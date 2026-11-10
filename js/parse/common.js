@@ -5,6 +5,7 @@ import { cleanText } from "./header.js";
 
 const CANDIDATE = /^(tcp|udp)(4|6|46)?$/i;
 const MAX_LINE_SAMPLE = 300;
+const MAX_SAMPLES = 50;
 
 /** Split text into lines on any line ending. */
 export function splitLines(text) {
@@ -22,14 +23,16 @@ export function createResult() {
   return {
     records: [],
     unparsed: [],
+    unparsedCount: 0,
     unknown,
     addUnparsed(lineNo, line) {
+      if (++this.unparsedCount > MAX_SAMPLES) return; // count all, keep a few
       // eslint-disable-next-line no-control-regex -- strip control characters from untrusted text
       this.unparsed.push({ lineNo, line: line.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").slice(0, MAX_LINE_SAMPLE) });
     },
     /** @returns {import('./types.js').FormatResult} */
     finish() {
-      return { records: this.records, unparsed: this.unparsed, unknownStates: [...unknown] };
+      return { records: this.records, unparsed: this.unparsed, unparsedCount: this.unparsedCount, unknownStates: [...unknown] };
     },
   };
 }
@@ -49,6 +52,8 @@ export function makeRecord(protoToken, local, remote, stateWord, unknown) {
   let family = local.ip === "*" && remote.ip !== "*" ? remote.family : local.family;
   if (lower.endsWith("6") && local.ip === "*" && remote.ip === "*") family = 6;
   const remoteWild = remote.ip === "*";
+  // Windows writes a listening socket's remote as 0.0.0.0:0, other systems as *:* — same meaning
+  const remotePort = remoteWild && remote.port === 0 ? null : remote.port;
   let state;
   if (stateWord) {
     state = normalizeState(stateWord);
@@ -61,7 +66,7 @@ export function makeRecord(protoToken, local, remote, stateWord, unknown) {
   } else {
     return null;
   }
-  return { proto, family, localIp: local.ip, localPort: local.port, remoteIp: remote.ip, remotePort: remote.port, state };
+  return { proto, family, localIp: local.ip, localPort: local.port, remoteIp: remote.ip, remotePort, state };
 }
 
 /** Attach optional pid/process to a record, validating them. */

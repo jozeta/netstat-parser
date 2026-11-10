@@ -15,7 +15,7 @@ test("established IPv4 line", () => {
 test("IPv6 listening line", () => {
   const r = parseWindows(en).records;
   assert.deepEqual(r[6], { proto: "tcp", family: 6, localIp: "*", localPort: 135,
-    remoteIp: "*", remotePort: 0, state: "LISTEN", pid: 1012 });
+    remoteIp: "*", remotePort: null, state: "LISTEN", pid: 1012 });
 });
 
 test("UDP line with empty state column", () => {

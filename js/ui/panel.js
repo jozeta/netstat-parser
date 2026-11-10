@@ -26,7 +26,6 @@ function hostButton(model, id, onPick, sub) {
 export function hostDetails({ model, host: h, dns, onPick }) {
   const g = model.groups.get(h.groupId);
   const edges = [...model.edges.values()].filter((e) => e.source === h.id || e.target === h.id);
-  const conflicts = model.conflicts.filter((c) => c.hostIds.includes(h.id));
   const name = h.ips.map((ip) => dns[ip]).find(Boolean);
   return [
     el("h2", { class: "lg-subtitle" }, h.label),
@@ -34,7 +33,7 @@ export function hostDetails({ model, host: h, dns, onPick }) {
       " ", ...h.tags.map((t) => el("span", { class: "lg-chip" }, t))),
     kv([["IP addresses", h.ips.join(", ") || "—"], ["DNS name", name ?? null], ["OS", OS_TEXT[h.os] ?? h.os], ["OS detail", h.osDetail],
       ["Role", ROLE_TEXT[h.role]], ["Subnet", g ? `${g.name}${g.cidr && g.cidr !== g.name ? ` (${g.cidr})` : ""}` : null]]),
-    conflicts.length ? el("p", { class: "np-warning" }, `Address conflict: ${conflicts.map((c) => `${c.ip} is also claimed by ${c.hostIds.filter((x) => x !== h.id).map((x) => model.hosts.get(x)?.label ?? x).join(", ")}`).join("; ")}`) : null,
+    h.warnings.length ? el("ul", { class: "np-warning lg-small" }, h.warnings.map((w) => el("li", null, w))) : null,
     title(`Listening (${h.listening.length})`),
     h.listening.length
       ? el("div", { class: "np-badges" }, h.listening.slice().sort((a, b) => a.port - b.port).map((l) =>
@@ -116,6 +115,7 @@ export function filesList({ files, onRemove }) {
       w.tooLarge ? "too large (over 50 MB)" : null,
       w.unparsedCount ? `${w.unparsedCount} lines not understood` : null,
       w.unknownStates.length ? `unknown states: ${w.unknownStates.join(", ")}` : null,
+      w.namesNotNumbers ? "shows service names instead of port numbers: re-run netstat or ss with -n" : null,
       w.truncatedAddresses ? `${w.truncatedAddresses} IPv6 addresses truncated by netstat (Linux: re-run with -W; macOS shortens scoped link-local addresses even with -W)` : null,
     ].filter(Boolean);
     return el("li", { class: "lg-row" },

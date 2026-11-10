@@ -2,11 +2,12 @@
 // rebuilt on every change. IDs are stable so the UI can keep positions and collapse state.
 
 import { parseCidr, inCidr, networkOf, DEFAULT_INTERNAL_RANGES } from "../lib/cidr.js";
-import { isLoopback } from "../lib/ip.js";
+import { isLoopback, normalizeIp } from "../lib/ip.js";
 import { classify } from "./settings.js";
 
 const LINK_LOCAL = ["169.254.0.0/16", "fe80::/10"].map(parseCidr);
 
+const shortName = (name) => (normalizeIp(name) ? name : name.split(".")[0]).toLowerCase();
 const isLinkLocal = (ip) => LINK_LOCAL.some((c) => inCidr(ip, c));
 const usable = (ip) => ip && ip !== "*" && !isLoopback(ip);
 
@@ -36,7 +37,8 @@ function newHost(id, { hostname = null, ip = null, collected, internal }) {
  * @param {object} settings validated settings
  */
 export function buildModel(files, settings) {
-  const internalRanges = [...DEFAULT_INTERNAL_RANGES, ...settings.internalRanges.map(parseCidr).filter(Boolean)];
+  // ranges the user named under Subnets are theirs too, so they count as internal
+  const internalRanges = [...DEFAULT_INTERNAL_RANGES, ...[...settings.internalRanges, ...settings.subnets.map((s) => s.cidr)].map(parseCidr).filter(Boolean)];
   const named = settings.subnets.map((s) => ({ cidr: parseCidr(s.cidr), name: s.name })).filter((s) => s.cidr)
     .sort((a, b) => b.cidr.prefix - a.cidr.prefix);
   const isInternal = (ip) => internalRanges.some((c) => inCidr(ip, c));
@@ -51,9 +53,11 @@ export function buildModel(files, settings) {
   // ---- collected hosts ----
   for (const f of files) {
     if (f.warnings?.notRecognised && f.records.length === 0) continue;
-    const id = `h:${f.hostname.toLowerCase()}`;
+    // "dc01.corp.local" (header) and "DC01" (file name) are one machine: key on the short name
+    const id = `h:${shortName(f.hostname)}`;
     let h = hosts.get(id);
     if (!h) { h = newHost(id, { hostname: f.hostname, collected: true, internal: true }); hosts.set(id, h); }
+    else if (f.hostname.includes(".") && !h.hostname.includes(".") && !normalizeIp(f.hostname)) { h.hostname = f.hostname; h.label = f.hostname; }
     fileHost.set(f, id);
     h.files.push({ fileName: f.fileName, format: f.format, collected: f.header?.collected ?? null });
     if (!h.osDetail && f.header?.os) h.osDetail = f.header.os;
@@ -113,6 +117,12 @@ export function buildModel(files, settings) {
     h.groupId = g.id;
   }
 
+  for (const c of conflicts.values()) {
+    for (const id of c.hostIds) {
+      const others = c.hostIds.filter((x) => x !== id).map((x) => hosts.get(x).label).join(", ");
+      hosts.get(id).warnings.push(`Address ${c.ip} is also claimed by ${others}`);
+    }
+  }
   const edges = buildEdges(files, fileHost, hosts, ipOwner, settings);
   assignRolesAndTags(hosts, edges, settings);
   return { hosts, groups, edges, conflicts: [...conflicts.values()] };
@@ -179,6 +189,8 @@ function buildEdges(files, fileHost, hosts, ipOwner, settings) {
   }
   for (const e of edges.values()) {
     const seenBy = new Set(e.observations.map((o) => o.hostId));
+    // "both": each host's own file shows this service connection (not necessarily the same socket pair:
+    // netstat is a snapshot, and ephemeral client ports differ between observations)
     e.seen = seenBy.has(e.source) && seenBy.has(e.target) ? "both" : "one";
     e.bothCollected = hosts.get(e.source).collected && hosts.get(e.target).collected;
     e.states.sort();

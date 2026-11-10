@@ -36,7 +36,7 @@ function parseAddresses(value) {
  * @returns {{header: import('./types.js').Header|null, body: string}}
  */
 export function parseHeader(text) {
-  const lines = text.replace(/^\uFEFF/, "").split("\n");
+  const lines = text.replace(/^\uFEFF/, "").split(/\r\n|\r|\n/);
   let i = 0;
   while (i < lines.length && lines[i].trim() === "") i++;
   if (i >= lines.length || lines[i].trim() !== START) return { header: null, body: text };

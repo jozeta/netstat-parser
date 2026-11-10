@@ -5,6 +5,7 @@ import { normalizeIp } from "../lib/ip.js";
 import { cleanText } from "../parse/header.js";
 import { STATES } from "../parse/types.js";
 import { validateSettings } from "./settings.js";
+import { uniqueFileNames } from "./files.js";
 
 export const SESSION_VERSION = 1;
 const FORMAT = "netstat-parser-session";
@@ -80,6 +81,7 @@ function parsedFile(f) {
       unknownStates: Array.isArray(w.unknownStates) ? w.unknownStates.slice(0, 50).map((s) => str(s, 40)).filter(Boolean) : [],
       notRecognised: w.notRecognised === true,
       truncatedAddresses: int(w.truncatedAddresses, 0, 1e9) ?? 0,
+      namesNotNumbers: w.namesNotNumbers === true,
     },
   };
 }
@@ -98,6 +100,7 @@ export function parseSession(text) {
   if (!data || typeof data !== "object" || data.format !== FORMAT) throw new Error("Not a netstat-parser session file");
   if (data.version !== SESSION_VERSION) throw new Error(`Unsupported session version ${String(data.version).slice(0, 20)}`);
   const files = Array.isArray(data.files) ? data.files.slice(0, 5000).map(parsedFile).filter(Boolean) : [];
+  uniqueFileNames(files.map((f) => f.fileName)).forEach((name, i) => { files[i].fileName = name; });
   const dns = {};
   for (const [ip, name] of entries(data.dns, 100000)) {
     if (canonicalIp(ip) && ip !== "*" && (name === null || (typeof name === "string" && HOSTNAME.test(name)))) dns[ip] = name;

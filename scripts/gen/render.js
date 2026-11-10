@@ -24,7 +24,8 @@ function renderWindows(sockets, locale) {
   const row = (a, b, c, d, e) => `  ${col(a, 7)}${col(b, 23)}${col(c, 23)}${d.padEnd(16)}${e}`;
   const lines = ["", t.title, "", row(t.cols[0], t.cols[1], t.cols[2], t.cols[3], "PID")];
   for (const r of sockets) {
-    const remote = r.proto === "udp" ? "*:*" : winEndpoint(r.remoteIp, r.remotePort, r.family);
+    // Windows prints a listening socket's remote as 0.0.0.0:0 / [::]:0
+    const remote = r.proto === "udp" ? "*:*" : winEndpoint(r.remoteIp, r.remoteIp === "*" && r.remotePort === null ? 0 : r.remotePort, r.family);
     const state = r.proto === "udp" ? "" : (t.states[r.state] ?? r.state);
     lines.push(row(r.proto.toUpperCase(), winEndpoint(r.localIp, r.localPort, r.family), remote, state, String(r.pid ?? "")));
   }
