@@ -22,7 +22,7 @@ test("parseHeader: reads every field and returns the body after '### netstat'", 
 });
 
 test("parseHeader: tolerates a BOM and leading blank lines", () => {
-  const { header } = parseHeader("﻿\n\n" + HEADER + BODY);
+  const { header } = parseHeader("\uFEFF\n\n" + HEADER + BODY);
   assert.equal(header.hostname, "WS-0142");
 });
 

@@ -28,7 +28,7 @@ test("decodeBytes: UTF-16BE with BOM", () => {
 });
 
 test("decodeBytes: UTF-8 with BOM and lone CR", () => {
-  const bytes = new TextEncoder().encode("﻿ABHÖREN\rx");
+  const bytes = new TextEncoder().encode("\uFEFFABHÖREN\rx");
   assert.equal(decodeBytes(bytes), "ABHÖREN\nx");
 });
 
