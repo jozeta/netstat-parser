@@ -2,3 +2,4 @@
 # (~/Desktop/code/tools/standards/STANDARDS.md). key=value, parsed, never executed.
 design=family
 design_decided=2026-11-10
+waive=SEC-3P-1: connect-src lists three DNS-over-HTTPS resolvers (Cloudflare, Google, Quad9) for the opt-in reverse-DNS lookup of Internet IPs; off by default, the user must pick a resolver and acknowledge that public IPs are sent; internal ranges are never sent (2026-11-10)

@@ -1,0 +1,2 @@
+/* Pre-empts the <style> element Cytoscape would inject (blocked by the CSP): same rule, as a file. */
+.__________cytoscape_container { position: relative; }

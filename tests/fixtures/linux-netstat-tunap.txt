@@ -1,0 +1,16 @@
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      812/sshd: /usr/sbin
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      640/systemd-resolve
+tcp        0      0 10.10.20.5:22           10.10.1.30:51544        ESTABLISHED 1201/sshd: root@pts/0
+tcp        0      0 10.10.20.5:43122        10.10.1.12:5432         ESTABLISHED 2210/python3
+tcp        0      0 10.10.20.5:43130        10.10.1.12:5432         TIME_WAIT   -
+tcp6       0      0 :::80                   :::*                    LISTEN      900/nginx: master
+tcp6       0      0 ::ffff:10.10.20.5:443   ::ffff:10.10.10.21:50122 ESTABLISHED 901/nginx: worker
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           640/systemd-resolve
+udp        0      0 0.0.0.0:68              0.0.0.0:*                           600/dhclient
+udp6       0      0 :::546                  :::*                                611/dhcpcd
+Active UNIX domain sockets (servers and established)
+Proto RefCnt Flags       Type       State         I-Node   PID/Program name     Path
+unix  2      [ ACC ]     STREAM     LISTENING     18542    1/systemd            /run/systemd/private
+unix  3      [ ]         STREAM     CONNECTED     21987    812/sshd

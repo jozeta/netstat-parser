@@ -17,8 +17,7 @@ for reference only).
 before building anything.** It holds the goals and non-goals, the input formats, the graph model,
 the UI, settings, exports and the build order. Change the spec first if the behaviour changes.
 
-Status: designed (2026-11-10). Implementation has not started; the starter screen is still the
-scaffold. Update this file as modules land.
+Status (2026-11-10): parsers, model and web UI built; the Python collector is next.
 
 ## Commands
 
@@ -31,6 +30,7 @@ Tests:
 ```sh
 npm test            # node --test: tests/*.test.mjs
 npm run lint        # ESLint, including the unsafe-DOM rule
+npm run gen:data    # write synthetic datasets to tests/data/generated/{small,medium,large} (gitignored)
 ```
 
 ## Layout
@@ -38,21 +38,37 @@ npm run lint        # ESLint, including the unsafe-DOM rule
 - `index.html`: entry page (strict CSP, viewport, Låda Glass app shell)
 - `css/app.css`, `js/app.js`: the app's own styles and script (no build step)
 - `vendor/lada-glass/1.1.1/`: the Låda Glass design system (copied; update with claude-check's advice)
-- `tests/`: `node --test` tests
-- `docs/superpowers/specs/`: the design
+- `tests/`: `node --test` tests; `tests/fixtures/` hand-written netstat samples per format (committed)
+- `docs/superpowers/specs/`, `docs/superpowers/plans/`: the design and implementation plans
+- `js/lib/ip.js`: IP/endpoint normalisation (canonical IPv6, IPv4-mapped → IPv4, wildcard `*`)
+- `js/parse/`: `parseFile(name, text)` in `index.js` is the entry point; `decode.js` (bytes → text,
+  UTF-16/code pages), `header.js`, `detect.js` (line-shape scoring), `states.js` (en/sv/de state
+  words, mojibake-tolerant), one parser per format, `common.js` shared helpers, `types.js` typedefs
+- `js/lib/cidr.js`: CIDR math and the default internal ranges
+- `js/model/`: `build.js` (`buildModel(files, settings)` → hosts/groups/edges), `settings.js`
+  (defaults, `validateSettings`, `classify`), `filter.js` (`parseQuery`, `applyFilter`), `exports.js`
+  (CSV, targets), `session.js` (save/open, untrusted import), `dns.js` (DoH PTR, injected fetch)
+- `scripts/gen/`: seeded network generator (`topology.js`) and renderer (`render.js`);
+  `scripts/generate-datasets.js` is the CLI
 
-Planned (see the spec):
-- `vendor/cytoscape/`: the graph library, with its licence
-- `js/` pure ES modules (parsers, model, classification, filters, exports), importable in Node
-  without a DOM, plus a thin DOM/Cytoscape layer and a Web Worker for parsing
-- `tests/fixtures/`: small hand-written edge cases (committed)
-- `tests/data/generated/`: synthetic datasets from the seeded generator (gitignored)
-- `collector/`: the Python 3 collector
+- `js/app.js`: the controller (state, wiring); `js/worker.js` + `js/worker-core.js`: parsing off
+  the main thread
+- `js/ui/`: `elements.js` (model → Cytoscape JSON, pure, collapse/merge/fade), `layout.js` (pure
+  grouped grid layout), `graph.js` (Cytoscape + style from CSS tokens), `panel.js`, `settings-view.js`,
+  `collect-view.js` (the collect commands), `storage.js` (settings in localStorage), `dom.js`, `icons.js`
+- `js/theme-boot.js`: tiny classic script in `<head>` that applies the saved theme before paint;
+  `js/ui/theme.js` holds the switch logic (key `netstat-parser.theme`; a per-browser convenience)
+- `js/model/files.js`: unique file names within a batch or session
+- `vendor/cytoscape-3.34.4/`: Cytoscape.js (MIT). `css/cytoscape-container.css` has the id
+  Cytoscape looks for, so it never injects a `<style>` (blocked by the CSP)
+- Planned: `collector/` (Python 3)
 
 ## Architecture rules
 
 - Logic lives in pure modules with tests, and the UI stays a thin layer on top. Parsing runs in a
-  Web Worker.
+  Web Worker. Cytoscape element IDs contain `: / |`: use `cy.getElementById()`, never `#id` selectors.
+- Risk colours are CSS tokens (`--np-risk-*`, with `--np-*` node/group tokens and `-alpha`
+  companions, because Cytoscape ignores the alpha in `rgba()`); the graph re-reads them on theme change.
 - Every parser produces the same record:
   `{proto, localIp, localPort, remoteIp, remotePort, state, pid?, process?, family}`.
   Formats are auto-detected and never rely on English headers. Windows state names are recognised

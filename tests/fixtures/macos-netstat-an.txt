@@ -1,0 +1,17 @@
+Active Internet connections (including servers)
+Proto Recv-Q Send-Q  Local Address          Foreign Address        (state)    
+tcp4       0      0  192.168.50.12.52344    203.0.113.10.443       ESTABLISHED
+tcp4       0      0  192.168.50.12.52310    10.10.1.20.22          ESTABLISHED
+tcp4       0      0  127.0.0.1.631          *.*                    LISTEN     
+tcp46      0      0  *.22                   *.*                    LISTEN     
+tcp6       0      0  fe80::1%lo0.49152      *.*                    LISTEN     
+tcp4       0      0  192.168.50.12.52300    198.51.100.7.80        TIME_WAIT  
+udp4       0      0  *.5353                 *.*                               
+udp6       0      0  *.5353                 *.*                               
+udp4       0      0  192.168.50.12.60123    192.168.50.1.53                   
+Active Multipath Internet connections
+Proto/ID  Flags      Local Address          Foreign Address        (state)    
+Active LOCAL (UNIX) domain sockets
+Address          Type   Recv-Q Send-Q            Inode             Conn             Refs          Nextref Addr
+a1b2c3d4e5f60001 stream      0      0                0 a1b2c3d4e5f60002                0                0 /var/run/mDNSResponder
+a1b2c3d4e5f60002 stream      0      0                0 a1b2c3d4e5f60001                0                0

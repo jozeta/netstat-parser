@@ -7,12 +7,12 @@ incident responders mapping a network they have been given access to.
 Everything runs locally in your browser. Files are never uploaded, and the app makes no network
 requests unless you switch on the optional DNS lookup.
 
-<!-- Add a screenshot once the UI exists: claude-shots --write netstat-parser (web), or a capture in docs/. -->
+![netstat-parser showing a synthetic network: subnets, the Internet group, risk-coloured connections and the details panel](docs/screenshot.png)
 
-**Status:** early development, being designed. Nothing below is built yet. The design is in
-[docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
+**Status:** early development (2026-11-10). The web app is usable; the remote collector script is
+next. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
 
-## Planned features
+## Features
 
 - **Load many files at once** (up to ~1000): Windows `netstat -ano` (English, Swedish and German
   output), Linux `netstat` and `ss`, and macOS `netstat`. The format is detected automatically,
@@ -33,6 +33,7 @@ requests unless you switch on the optional DNS lookup.
   edit the role rules.
 - **Optional DNS lookup** for Internet addresses via DNS-over-HTTPS (Cloudflare, Google or Quad9).
   It's off by default, and the app warns you before sending anything.
+- **Dark and light themes:** follows your system, or pick Dark or Light in the sidebar.
 - **Exports:**
   - PNG
   - a saved session (`.json`) you can reopen later
@@ -40,9 +41,9 @@ requests unless you switch on the optional DNS lookup.
   - a targets file listing uncollected hosts, for the collector
 - **"How to collect" page** with copy-ready commands per OS. Each command writes
   `<hostname>_netstat.txt` with a short header (hostname, IPs, OS, time).
-- **Collector script** (`collector/`, Python 3): gathers the same files remotely over SSH, WinRM
-  or SMB (password, key or hash) and saves them on your machine. It only runs read-only commands
-  and has a dry-run mode.
+- **Collector script** (`collector/`, Python 3, *in progress*): gathers the same files remotely
+  over SSH, WinRM or SMB (password, key or hash) and saves them on your machine. It only runs
+  read-only commands and has a dry-run mode.
 
 Job data is only kept in sessions you export yourself. The app does not auto-save it in the browser.
 
@@ -51,6 +52,15 @@ Job data is only kept in sessions you export yourself. The app does not auto-sav
 ```sh
 python3 -m http.server 8580      # then open http://localhost:8580/ (or: claude-update)
 ```
+
+1. On each computer, run the command for its OS from the app's **How to collect** page. It writes
+   `<hostname>_netstat.txt`.
+2. Open the app, click **Load files** (or drop the files on the graph), and select them all.
+3. Click hosts, groups or lines for details; search with `port:445 risk:red`, `collected:no`,
+   `seen:one` and so on; name your subnets and tune the protocol risk table in **Settings**.
+4. **Export → Session** saves the job to reopen later (nothing is saved automatically).
+
+Try it without real data: `npm run gen:data` writes synthetic networks to `tests/data/generated/`.
 
 ## Tests
 

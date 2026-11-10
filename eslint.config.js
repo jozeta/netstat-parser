@@ -12,7 +12,12 @@ export default [
     rules: { "no-eval": "error", "no-implied-eval": "error", "no-new-func": "error" },
   },
   {
-    files: ["**/*.test.*", "tests/**", "test/**"],
-    languageOptions: { globals: { process: "readonly" } },
+    // Pure modules also run in a Web Worker.
+    files: ["js/**"],
+    languageOptions: { globals: { TextDecoder: "readonly", self: "readonly", DOMException: "readonly", fetch: "readonly", AbortController: "readonly", Blob: "readonly", Node: "readonly", navigator: "readonly", getComputedStyle: "readonly", Worker: "readonly", requestAnimationFrame: "readonly", clearTimeout: "readonly", location: "readonly", MutationObserver: "readonly", HTMLElement: "readonly", CSS: "readonly" } },
+  },
+  {
+    files: ["**/*.test.*", "tests/**", "test/**", "scripts/**"],
+    languageOptions: { globals: { process: "readonly", URL: "readonly", TextDecoder: "readonly", TextEncoder: "readonly", performance: "readonly", AbortController: "readonly", DOMException: "readonly", structuredClone: "readonly" } },
   },
 ];

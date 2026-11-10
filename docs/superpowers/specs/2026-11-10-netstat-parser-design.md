@@ -115,7 +115,10 @@ addresses: 10.0.5.12/24, fe80::1c2a:3bff:fe4d:12/64
 <raw netstat / ss output>
 ```
 
-The exact command lines per OS are designed by the builder; requirements: output file named
+The exact command lines per OS are designed by the builder; requirements: Linux `netstat` and
+macOS `netstat` must be run with `-W` (wide), because without it they truncate long IPv6 addresses
+(net-tools silently yields a different valid address; the Linux parser warns via
+`warnings.truncatedAddresses`); output file named
 `<hostname>_netstat.txt`, header as above, works without admin where possible (and says what is
 lost without admin, e.g. PIDs/process names), Windows in both PowerShell and cmd if practical.
 
