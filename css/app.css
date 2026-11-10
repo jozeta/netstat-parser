@@ -1,6 +1,8 @@
 /* The app's own styles. Build on the Låda Glass tokens (var(--lg-…)) and lg- components; animate
    only with --lg-dur-* and keep a prefers-reduced-motion rule for any animation added here. */
 
+[hidden] { display: none !important; }
+
 /* ---- risk tokens (read by the graph via getComputedStyle) ---- */
 :root, [data-theme="dark"] {
   --np-risk-vulnerable: #ff5d5d;
@@ -10,10 +12,13 @@
   --np-node: #2a3446;
   --np-node-seen: #3a3f48;
   --np-node-text: #e8edf5;
-  --np-group: rgba(120, 150, 200, .08);
-  --np-group-border: rgba(150, 180, 230, .35);
-  --np-internet: rgba(90, 170, 255, .10);
+  --np-group: #7896c8;
+  --np-group-alpha: .10;
+  --np-group-border: #6a7f9f;
+  --np-internet: #5aaaff;
+  --np-internet-alpha: .12;
   --np-select: #7cc4ff;
+  --np-icon: #a9bddb;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
@@ -24,10 +29,13 @@
     --np-node: #e9eef6;
     --np-node-seen: #d9dce1;
     --np-node-text: #16202e;
-    --np-group: rgba(40, 70, 120, .05);
-    --np-group-border: rgba(40, 70, 120, .30);
-    --np-internet: rgba(20, 110, 220, .07);
+    --np-group: #284678;
+    --np-group-alpha: .06;
+    --np-group-border: #8ea0bd;
+    --np-internet: #146edc;
+    --np-internet-alpha: .08;
     --np-select: #0b6bcb;
+    --np-icon: #3d5578;
   }
 }
 [data-theme="light"] {
@@ -38,10 +46,13 @@
   --np-node: #e9eef6;
   --np-node-seen: #d9dce1;
   --np-node-text: #16202e;
-  --np-group: rgba(40, 70, 120, .05);
-  --np-group-border: rgba(40, 70, 120, .30);
-  --np-internet: rgba(20, 110, 220, .07);
+  --np-group: #284678;
+    --np-group-alpha: .06;
+  --np-group-border: #8ea0bd;
+  --np-internet: #146edc;
+    --np-internet-alpha: .08;
   --np-select: #0b6bcb;
+  --np-icon: #3d5578;
 }
 
 .np-visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
@@ -65,7 +76,7 @@
 
 /* ---- workspace ---- */
 .np-work { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--lg-space-s); min-height: 0; }
-.np-graph-card { position: relative; padding: 0; overflow: hidden; min-height: 520px; }
+.np-graph-card { position: relative; padding: 0; overflow: hidden; min-height: 520px; height: calc(100vh - 170px); }
 .np-graph { position: absolute; inset: 0; }
 .np-graph.np-drop { outline: 2px dashed var(--lg-accent); outline-offset: -6px; }
 .np-empty { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--lg-space-xs); background: none; border: 0; }
@@ -84,8 +95,9 @@
 .np-host-seen { width: 12px; height: 12px; border: 1px solid var(--lg-muted); border-radius: 50%; background: var(--np-node-seen); opacity: .6; }
 
 /* ---- panel ---- */
-.np-panel { display: flex; flex-direction: column; gap: var(--lg-space-s); max-height: 78vh; min-width: 0; overflow: hidden; }
-.np-pane { overflow: auto; min-height: 0; display: grid; gap: var(--lg-space-s); align-content: start; }
+.np-panel { display: flex; flex-direction: column; gap: var(--lg-space-s); max-height: calc(100vh - 170px); min-width: 0; overflow: hidden; }
+.np-panel > .lg-tabs { flex: none; align-self: flex-start; }
+.np-pane { flex: 1; overflow: auto; min-height: 0; display: grid; gap: var(--lg-space-s); align-content: start; }
 .np-pane[hidden] { display: none; }
 .np-pane h2 { margin: 0; word-break: break-word; }
 .np-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--lg-space-xxs) var(--lg-space-s); margin: 0; }
@@ -123,9 +135,10 @@
 @media (max-width: 1100px) {
   .np-work { grid-template-columns: minmax(0, 1fr); }
   .np-panel { max-height: none; }
-  .np-graph-card { min-height: 60vh; }
+  .np-graph-card { min-height: 60vh; height: 70vh; }
 }
 @media (max-width: 760px) {
+  .np-privacy { display: none; }
   .np-legend { position: static; margin: var(--lg-space-s); }
   .np-graph-card { display: flex; flex-direction: column; justify-content: flex-end; }
   .np-menu-list { right: auto; left: 0; }

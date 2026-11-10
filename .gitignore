@@ -50,3 +50,6 @@ hosts*.csv
 
 # Local research notes (kept out of git unless asked)
 PRODUCT_RESEARCH_AND_FEATURE_ROADMAP.md
+
+# Browser automation output
+.playwright-mcp/
