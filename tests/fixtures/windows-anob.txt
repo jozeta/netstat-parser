@@ -1,0 +1,14 @@
+
+Active Connections
+
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       1012
+  RpcSs
+ [svchost.exe]
+  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING       4
+ Can not obtain ownership information
+  TCP    10.10.10.21:49820      203.0.113.10:443       ESTABLISHED     7344
+ [msedge.exe]
+  UDP    0.0.0.0:53             *:*                                    2200
+  Dnscache
+ [svchost.exe]
