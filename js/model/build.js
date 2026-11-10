@@ -3,6 +3,7 @@
 
 import { parseCidr, inCidr, networkOf } from "../lib/cidr.js";
 import { isLoopback } from "../lib/ip.js";
+import { classify } from "./settings.js";
 
 const INTERNAL_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "fe80::/10", "fc00::/7"].map(parseCidr);
 const LINK_LOCAL = ["169.254.0.0/16", "fe80::/10"].map(parseCidr);
@@ -113,5 +114,89 @@ export function buildModel(files, settings) {
     h.groupId = g.id;
   }
 
-  return { hosts, groups, edges: new Map(), conflicts: [...conflicts.values()] };
+  const edges = buildEdges(files, fileHost, hosts, ipOwner, settings);
+  assignRolesAndTags(hosts, edges, settings);
+  return { hosts, groups, edges, conflicts: [...conflicts.values()] };
+}
+
+const LISTENING = new Set(["LISTEN", "BOUND"]);
+
+function buildEdges(files, fileHost, hosts, ipOwner, settings) {
+  // listening sockets per collected host
+  const listens = new Map();
+  for (const f of files) {
+    const hid = fileHost.get(f);
+    if (!hid) continue;
+    const h = hosts.get(hid);
+    const set = listens.get(hid) ?? new Set();
+    listens.set(hid, set);
+    for (const r of f.records) {
+      if (!LISTENING.has(r.state) || isLoopback(r.localIp) || r.localPort === null) continue;
+      const key = `${r.proto}/${r.localPort}`;
+      if (h.listening.some((l) => l.proto === r.proto && l.port === r.localPort && l.bindIp === r.localIp)) { set.add(key); continue; }
+      set.add(key);
+      const { name, risk } = classify(r.localPort, r.proto, settings);
+      const entry = { proto: r.proto, port: r.localPort, bindIp: r.localIp };
+      if (r.pid !== undefined) entry.pid = r.pid;
+      if (r.process !== undefined) entry.process = r.process;
+      h.listening.push(Object.assign(entry, { name, risk }));
+    }
+  }
+  const listensOn = (hid, proto, port) => listens.get(hid)?.has(`${proto}/${port}`) ?? false;
+
+  const edges = new Map();
+  for (const f of files) {
+    const hid = fileHost.get(f);
+    if (!hid) continue;
+    for (const r of f.records) {
+      if (LISTENING.has(r.state) || !usable(r.remoteIp) || isLoopback(r.localIp)) continue;
+      if (r.localPort === null || r.remotePort === null) continue;
+      const rid = ipOwner.get(r.remoteIp) ?? `ip:${r.remoteIp}`;
+      if (rid === hid) continue;
+      const localServes = listensOn(hid, r.proto, r.localPort);
+      const remoteServes = listensOn(rid, r.proto, r.remotePort);
+      let localIsServer;
+      if (localServes !== remoteServes) localIsServer = localServes;
+      else localIsServer = r.localPort < r.remotePort;
+      const [source, target, port] = localIsServer ? [rid, hid, r.localPort] : [hid, rid, r.remotePort];
+      const id = `e:${source}|${target}|${r.proto}/${port}`;
+      let e = edges.get(id);
+      if (!e) {
+        const { name, risk } = classify(port, r.proto, settings);
+        e = { id, source, target, proto: r.proto, port, name, risk, seen: "one", bothCollected: false, states: [], observations: [] };
+        edges.set(id, e);
+      }
+      const obs = { fileName: f.fileName, hostId: hid, localIp: r.localIp, localPort: r.localPort, remoteIp: r.remoteIp, remotePort: r.remotePort, state: r.state };
+      if (r.pid !== undefined) obs.pid = r.pid;
+      if (r.process !== undefined) obs.process = r.process;
+      e.observations.push(obs);
+      if (!e.states.includes(r.state)) e.states.push(r.state);
+    }
+  }
+  for (const e of edges.values()) {
+    const seenBy = new Set(e.observations.map((o) => o.hostId));
+    e.seen = seenBy.has(e.source) && seenBy.has(e.target) ? "both" : "one";
+    e.bothCollected = hosts.get(e.source).collected && hosts.get(e.target).collected;
+    e.states.sort();
+  }
+  return edges;
+}
+
+function assignRolesAndTags(hosts, edges, settings) {
+  const inbound = new Map(), outbound = new Map(), served = new Map();
+  for (const e of edges.values()) {
+    outbound.set(e.source, true);
+    inbound.set(e.target, true);
+    const s = served.get(e.target) ?? new Set();
+    s.add(e.port);
+    served.set(e.target, s);
+  }
+  for (const h of hosts.values()) {
+    const i = inbound.has(h.id), o = outbound.has(h.id);
+    h.role = i && o ? "both" : i ? "server" : o ? "client" : "unknown";
+    const ports = new Set([...(served.get(h.id) ?? []), ...h.listening.map((l) => l.port)]);
+    h.tags = settings.roleRules
+      .filter((r) => (r.all.length === 0 || r.all.every((p) => ports.has(p))) && (r.any.length === 0 || r.any.some((p) => ports.has(p))))
+      .map((r) => r.tag);
+  }
 }
