@@ -35,7 +35,11 @@ const has = (hay, needle) => lc(hay).includes(needle);
 function hostAttr(h, model, field, v) {
   const g = model.groups.get(h.groupId);
   switch (field) {
-    case "ip": return h.ips.some((ip) => ip.startsWith(v));
+    case "ip": {
+      // exact, or a prefix when it ends in '.', ':' or '*'
+      const prefix = v.endsWith("*") ? v.slice(0, -1) : /[.:]$/.test(v) ? v : null;
+      return h.ips.some((ip) => (prefix !== null ? ip.startsWith(prefix) : ip === v));
+    }
     case "host": return has(h.label, v) || has(h.hostname, v);
     case "os": return h.os === v || has(h.osDetail, v);
     case "subnet": return has(g?.name, v) || has(g?.cidr, v);

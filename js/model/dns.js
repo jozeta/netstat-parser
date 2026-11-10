@@ -2,7 +2,7 @@
 // warns first. fetch is injected so this stays testable and never runs on import.
 
 import { ipToBigInt, isLoopback } from "../lib/ip.js";
-import { inCidr, DEFAULT_INTERNAL_RANGES } from "../lib/cidr.js";
+import { inCidr, parseCidr, DEFAULT_INTERNAL_RANGES } from "../lib/cidr.js";
 
 export const RESOLVERS = Object.freeze({
   cloudflare: { label: "Cloudflare", url: (q) => `https://cloudflare-dns.com/dns-query?name=${q}&type=PTR`, headers: { accept: "application/dns-json" } },
@@ -30,19 +30,23 @@ export function parsePtrAnswer(json) {
   return NAME.test(name) ? name.toLowerCase() : null;
 }
 
-const isInternet = (ip) => !isLoopback(ip) && ip !== "*" && !DEFAULT_INTERNAL_RANGES.some((c) => inCidr(ip, c));
+// never resolvable on the public Internet, or not unicast
+const NOT_PUBLIC = ["0.0.0.0/8", "224.0.0.0/4", "240.0.0.0/4", "ff00::/8"].map(parseCidr);
 const abortError = () => new DOMException("Aborted", "AbortError");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * @param {string[]} ips
  * @param {{resolver: string, fetch: Function, concurrency?: number, delayMs?: number, signal?: AbortSignal,
- *   onProgress?: (done: number, total: number) => void}} opts
+ *   onProgress?: (done: number, total: number) => void, internalRanges?: string[]}} opts
  * @returns {Promise<Map<string, string|null>>}
  */
-export async function resolvePtrs(ips, { resolver, fetch, concurrency = 4, delayMs = 100, signal, onProgress }) {
+export async function resolvePtrs(ips, { resolver, fetch, concurrency = 4, delayMs = 100, signal, onProgress, internalRanges = [] }) {
   const r = RESOLVERS[resolver];
   if (!Object.hasOwn(RESOLVERS, resolver) || !r) throw new Error("Unknown resolver");
+  // Privacy: only public addresses ever leave the browser (settings' internal ranges included).
+  const blocked = [...DEFAULT_INTERNAL_RANGES, ...NOT_PUBLIC, ...internalRanges.map(parseCidr).filter(Boolean)];
+  const isInternet = (ip) => !isLoopback(ip) && ip !== "*" && !blocked.some((c) => inCidr(ip, c));
   const queue = [...new Set(ips)].filter(isInternet);
   const out = new Map();
   let done = 0, next = 0;

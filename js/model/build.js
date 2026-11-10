@@ -151,11 +151,16 @@ function buildEdges(files, fileHost, hosts, ipOwner, settings) {
       if (LISTENING.has(r.state) || !usable(r.remoteIp) || isLoopback(r.localIp)) continue;
       if (r.localPort === null || r.remotePort === null) continue;
       const rid = ipOwner.get(r.remoteIp) ?? `ip:${r.remoteIp}`;
-      if (rid === hid) continue;
+      // own address (e.g. a Docker bridge IP that another host also has) → not an edge
+      if (rid === hid || hosts.get(hid).ips.includes(r.remoteIp)) continue;
       const localServes = listensOn(hid, r.proto, r.localPort);
       const remoteServes = listensOn(rid, r.proto, r.remotePort);
+      // "known" = we have that host's listening table, so "not listed" means "not listening"
+      const localKnown = (listens.get(hid)?.size ?? 0) > 0;
+      const remoteKnown = (listens.get(rid)?.size ?? 0) > 0;
       let localIsServer;
       if (localServes !== remoteServes) localIsServer = localServes;
+      else if (!localServes && localKnown !== remoteKnown) localIsServer = !localKnown;
       else localIsServer = r.localPort < r.remotePort;
       const [source, target, port] = localIsServer ? [rid, hid, r.localPort] : [hid, rid, r.remotePort];
       const id = `e:${source}|${target}|${r.proto}/${port}`;

@@ -1,13 +1,17 @@
 // CSV and collector-targets exports. Cells are escaped against CSV/formula injection.
 
+import { parseCidr, inCidr } from "../lib/cidr.js";
+
 const FORMULA = /^[=+\-@\t\r]/;
+const LINK_LOCAL = ["fe80::/10", "169.254.0.0/16"].map(parseCidr);
 
 /** @param {unknown} v */
 export function csvCell(v) {
   if (v === null || v === undefined) return "";
   let s = String(v);
   if (FORMULA.test(s)) s = `'${s}`;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // ';' too: Swedish (and other) Excel locales use it as the list separator
+  return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 const row = (cells) => cells.map(csvCell).join(",");
@@ -54,6 +58,7 @@ export function targetsFile(model) {
   const lines = [];
   for (const h of model.hosts.values()) {
     if (h.collected || !h.internal || !h.ips.length) continue;
+    if (LINK_LOCAL.some((c) => inCidr(h.ips[0], c))) continue; // unusable without a scope id
     const p = served.get(h.id) ?? new Set();
     const method = p.has(5985) || p.has(5986) ? "winrm" : p.has(445) ? "smb" : p.has(22) ? "ssh" : null;
     lines.push(method ? `${h.ips[0]} ${method} user=CHANGEME` : `${h.ips[0]} ssh user=CHANGEME  # method unknown`);
