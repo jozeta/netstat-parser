@@ -8,6 +8,7 @@ import { normalizeState } from "./states.js";
 import { splitLines, isCandidate, createResult, makeRecord, addProcess } from "./common.js";
 
 const PROC_PID = /^([^:\s]+):(\d+)$/;
+const TRUNCATED = /:\.(\d+|\*)$/;
 
 /**
  * @param {string} body
@@ -15,9 +16,12 @@ const PROC_PID = /^([^:\s]+):(\d+)$/;
  */
 export function parseMacos(body) {
   const res = createResult();
+  let truncated = 0;
   splitLines(body).forEach((line, idx) => {
     const tokens = line.trim().split(/\s+/);
     if (!isCandidate(tokens)) return;
+    // netstat cuts long IPv6 addresses (even with -W for scoped link-local ones): "fe80::1a2b:3c4d:.62015"
+    if (TRUNCATED.test(tokens[3] ?? "") || TRUNCATED.test(tokens[4] ?? "")) { truncated++; return; }
     const ok = tokens.length >= 5 && /^\d+$/.test(tokens[1]) && /^\d+$/.test(tokens[2]);
     const local = ok ? splitEndpoint(tokens[3], ".") : null;
     const remote = local ? splitEndpoint(tokens[4], ".") : null;
@@ -33,5 +37,5 @@ export function parseMacos(body) {
     if (pp) addProcess(rec, pp[2], pp[1]);
     res.records.push(rec);
   });
-  return res.finish();
+  return { ...res.finish(), truncated };
 }

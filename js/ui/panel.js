@@ -116,7 +116,7 @@ export function filesList({ files, onRemove }) {
       w.tooLarge ? "too large (over 50 MB)" : null,
       w.unparsedCount ? `${w.unparsedCount} lines not understood` : null,
       w.unknownStates.length ? `unknown states: ${w.unknownStates.join(", ")}` : null,
-      w.truncatedAddresses ? `${w.truncatedAddresses} IPv6 addresses may be truncated (re-run netstat with -W)` : null,
+      w.truncatedAddresses ? `${w.truncatedAddresses} IPv6 addresses truncated by netstat (Linux: re-run with -W; macOS shortens scoped link-local addresses even with -W)` : null,
     ].filter(Boolean);
     return el("li", { class: "lg-row" },
       el("div", { class: "np-grow" }, el("strong", null, f.fileName), el("div", { class: `lg-small ${w.notRecognised || w.unparsedCount ? "np-warning" : "lg-muted"}` }, `${f.hostname} · ${notes.join(" · ")}`),

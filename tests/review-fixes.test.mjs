@@ -32,3 +32,12 @@ test("cleanText strips bidi and zero-width characters; fileName is cleaned and c
   assert.doesNotMatch(pf.fileName, /[\u0000-\u001f]/);
   assert.ok(pf.fileName.length <= 255);
 });
+
+test("macOS: truncated IPv6 endpoints (\"fe80::1a2b:3c4d:.62015\") are counted as truncated, not unparsed", () => {
+  const text = "tcp4  0  0  192.168.50.12.52344  203.0.113.10.443  ESTABLISHED  131072  131768  Safari:412\n"
+    + "tcp6  0  0  fe80::1a2b:3c4d:.62015 fe80::5e6f:7a8b:.49153 ESTABLISHED  78474  5820  131072  131376  rapportd:96\n";
+  const pf = parseFile("m_netstat.txt", text);
+  assert.equal(pf.records.length, 1);
+  assert.equal(pf.warnings.unparsedCount, 0);
+  assert.equal(pf.warnings.truncatedAddresses, 1);
+});
