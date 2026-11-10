@@ -12,7 +12,12 @@ export default [
     rules: { "no-eval": "error", "no-implied-eval": "error", "no-new-func": "error" },
   },
   {
-    files: ["**/*.test.*", "tests/**", "test/**"],
-    languageOptions: { globals: { process: "readonly" } },
+    // Pure modules also run in a Web Worker.
+    files: ["js/**"],
+    languageOptions: { globals: { TextDecoder: "readonly", self: "readonly" } },
+  },
+  {
+    files: ["**/*.test.*", "tests/**", "test/**", "scripts/**"],
+    languageOptions: { globals: { process: "readonly", URL: "readonly", TextDecoder: "readonly", TextEncoder: "readonly" } },
   },
 ];
