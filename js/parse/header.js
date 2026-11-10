@@ -21,11 +21,11 @@ export function cleanText(s, max) {
 function parseAddresses(value) {
   const out = [];
   for (const part of value.split(",")) {
-    const m = /^\s*([^/\s]+)\/(\d{1,3})\s*$/.exec(part);
+    const m = /^\s*([^/\s]+)(?:\/(\d{1,3}))?\s*$/.exec(part);
     if (!m) continue;
     const ip = normalizeIp(m[1]);
-    const prefix = Number(m[2]);
-    if (!ip || ip.ip === "*" || prefix > (ip.family === 4 ? 32 : 128)) continue;
+    const prefix = m[2] === undefined ? null : Number(m[2]);
+    if (!ip || ip.ip === "*" || (prefix !== null && prefix > (ip.family === 4 ? 32 : 128))) continue;
     out.push({ ip: ip.ip, prefix });
   }
   return out;

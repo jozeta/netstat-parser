@@ -59,7 +59,7 @@ export function buildModel(files, settings) {
     if (!h.osDetail && f.header?.os) h.osDetail = f.header.os;
     if (h.os === "unknown" || f.header?.os) h.os = osFrom(h.osDetail, f.format);
     const own = [];
-    for (const a of f.header?.addresses ?? []) { own.push(a.ip); prefixHint.set(a.ip, a.prefix); }
+    for (const a of f.header?.addresses ?? []) { own.push(a.ip); if (a.prefix !== null) prefixHint.set(a.ip, a.prefix); }
     for (const r of f.records) if (usable(r.localIp)) own.push(r.localIp);
     for (const ip of own) {
       if (!h.ips.includes(ip)) h.ips.push(ip);

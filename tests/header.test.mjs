@@ -61,3 +61,8 @@ test("hostile hostname is cleaned and capped", () => {
   assert.ok(hostnameFromFileName("\u0001" + "B".repeat(5000) + "_netstat.txt").length <= 253);
   assert.equal(cleanText("  a\u0000b\u009fc  ", 10), "abc");
 });
+
+test("addresses may lack a /prefix (macOS ifconfig)", () => {
+  const { header } = parseHeader("### netstat-parser v1\nhostname: MAC-1\naddresses: 192.168.50.12, fd10:50::20/64, nope\n### netstat\n");
+  assert.deepEqual(header.addresses, [{ ip: "192.168.50.12", prefix: null }, { ip: "fd10:50::20", prefix: 64 }]);
+});

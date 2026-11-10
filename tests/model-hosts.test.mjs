@@ -92,3 +92,9 @@ test("generated small: hosts and groups line up with the generator", () => {
   const cidrs = new Set(net.subnets.map((s) => `g:${s.cidr}`));
   for (const id of m.groups.keys()) assert.ok(id === "g:internet" || cidrs.has(id) || id.startsWith("g:fd10:50::"), id);
 });
+
+test("a header address without prefix uses the default /24 grouping", () => {
+  const text = "### netstat-parser v1\nhostname: MAC-1\naddresses: 192.168.50.12\n### netstat\nActive Internet connections\ntcp4 0 0 192.168.50.12.50000 203.0.113.10.443 ESTABLISHED\n";
+  const m = buildModel([parseFile("MAC-1_netstat.txt", text)], DEFAULT_SETTINGS);
+  assert.equal(m.hosts.get("h:mac-1").groupId, "g:192.168.50.0/24");
+});

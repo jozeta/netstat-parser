@@ -55,7 +55,7 @@ function header(h) {
   if (!h || typeof h !== "object") return null;
   const addresses = Array.isArray(h.addresses) ? h.addresses.map((a) => {
     const ip = a && canonicalIp(a.ip);
-    const prefix = a && int(a.prefix, 0, 128);
+    const prefix = a && (a.prefix === null ? null : int(a.prefix, 0, 128));
     return ip && ip !== "*" && prefix !== undefined ? { ip, prefix } : null;
   }).filter(Boolean) : [];
   return { hostname: str(h.hostname, 253) || null, os: str(h.os, 200) || null, collected: str(h.collected, 40) || null, addresses };

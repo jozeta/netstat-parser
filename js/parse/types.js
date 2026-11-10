@@ -7,7 +7,7 @@
  * state: one of STATES or 'UNKNOWN'.
  */
 /** @typedef {{ records: NetRecord[], unparsed: {lineNo: number, line: string}[], unknownStates: string[] }} FormatResult */
-/** @typedef {{ hostname: string|null, os: string|null, collected: string|null, addresses: {ip: string, prefix: number}[] }} Header */
+/** @typedef {{ hostname: string|null, os: string|null, collected: string|null, addresses: {ip: string, prefix: number|null}[] }} Header */
 /** @typedef {'windows'|'linux-netstat'|'linux-ss'|'macos'} Format */
 /**
  * @typedef {{ fileName: string, format: Format|null, hostname: string, hostnameSource: 'header'|'filename',
