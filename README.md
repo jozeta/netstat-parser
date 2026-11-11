@@ -7,7 +7,20 @@ incident responders mapping a network they have been given access to.
 Everything runs locally in your browser. Files are never uploaded, and the app makes no network
 requests unless you switch on the optional DNS lookup.
 
-![netstat-parser showing a synthetic network: subnets, the Internet group, risk-coloured connections and the details panel](docs/screenshot.png)
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/overview-dark.png" alt="The network map in the dark theme: subnet groups, the Internet cloud, risk-coloured connections and a selected domain controller's details"><br>Network map: subnets, the Internet cloud and risk-coloured connections; a selected host's details on the right.</td>
+    <td width="33%"><img src="docs/screenshots/path-finding.png" alt="A three-hop path from LNX-002 to DB01 highlighted on the graph and listed hop by hop in the details panel"><br>Path finding: the shortest chain of observed connections from one host to another.</td>
+    <td width="33%"><img src="docs/screenshots/neighbourhood.png" alt="Only WEB01 and the hosts one connection away from it, re-packed"><br>Neighbourhood view: only what is one hop around the selected web server.</td>
+  </tr>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/filter-light.png" alt="The light theme with the Vulnerable quick filter on: only red connections stay visible"><br>Light theme with the <b>Vulnerable</b> quick filter (<code>risk:red</code>).</td>
+    <td width="33%"><img src="docs/screenshots/how-to-collect.png" alt="The How to collect page with copy-ready commands for Windows PowerShell, cmd and Linux"><br>How to collect: copy-ready, read-only commands per OS.</td>
+    <td width="33%"><img src="docs/screenshots/phone.png" alt="The app on a 390 pixel wide phone screen"><br>On a phone: the toolbar wraps, nothing scrolls sideways.</td>
+  </tr>
+</table>
+
+All screenshots use the synthetic test networks (`npm run gen:data`), never real data.
 
 **Version 0.2.0** (2026-11-11), the first public release. The web app and the collector script are
 usable; the collector's WinRM path and the collect commands have not yet been tried on real
