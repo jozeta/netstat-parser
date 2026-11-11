@@ -84,6 +84,6 @@ export function renderCollect(root, { toast }) {
     el("section", { class: "lg-card lg-stack" },
       el("h2", { class: "lg-subtitle" }, "Many machines at once"),
       el("p", null, "The collector script in this project's ", el("code", { class: "lg-code" }, "collector/"),
-        " folder (Python 3) runs the same commands remotely over SSH, WinRM or SMB and saves the files on your machine. Export ",
+        " folder (Python 3) runs the same commands remotely over SSH or WinRM and saves the files on your machine. Export ",
         el("em", null, "Collector targets"), " from the graph to get a starting list of hosts that appear in your files but have none of their own.")));
 }

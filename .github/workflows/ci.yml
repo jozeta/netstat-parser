@@ -22,3 +22,8 @@ jobs:
         run: npm run lint
       - name: Tests
         run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Collector tests
+        run: npm run test:collector

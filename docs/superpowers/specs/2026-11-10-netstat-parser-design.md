@@ -33,13 +33,14 @@ repo), which merged `*.txt` netstat files into a yEd `.graphml` file. Lessons fr
 6. Editable settings: protocol risk lists, subnet names/ranges, role rules, optional DNS lookup.
 7. Export PNG, session JSON and CSV; export uncollected hosts as a collector targets file.
 8. An in-app "How to collect" page with copy-ready commands per OS.
-9. A separate Python collector script that gathers the files remotely over SSH / WinRM / SMB.
+9. A separate Python collector script that gathers the files remotely over SSH / WinRM.
 
 ## Non-goals
 
 - Live packet capture, host discovery or scanning (the collector only touches listed targets).
 - Any change on target machines beyond what remote execution unavoidably leaves behind
-  (documented, e.g. impacket service creation for SMB exec).
+  (documented: login records, SSH/WinRM logs, a short-lived PowerShell session).
+- Remote execution over SMB or pass-the-hash (owner decision, 2026-11-11).
 - Auto-saving job data in the browser (see Data handling).
 - Interface languages other than English.
 
@@ -243,24 +244,40 @@ In-app page (or panel) with copy buttons for Windows (PowerShell, and cmd if pra
 
 ### Collector (`collector/`, Python 3, built after the web app)
 
-- Runs on Linux, macOS and Windows operator machines. Standard library only for SSH (it shells out
-  to the system `ssh`); optional extras for Windows targets: `pypsrp` (WinRM) and `impacket` (SMB
-  exec, pass-the-hash). Missing extras → clear message, only those targets skipped.
+*(Revised 2026-11-11, owner decision: SSH and WinRM only. SMB exec and pass-the-hash are out of
+scope; `smb` targets and `hash=` keys are rejected with a clear message.)*
+
+- Runs on Linux, macOS and Windows operator machines, Python 3.9+. Standard library only for SSH
+  (it shells out to the system `ssh`, keys or agent only, `BatchMode=yes`; unknown host keys fail
+  unless `--accept-new-hostkeys`). Optional extra for Windows targets: `pypsrp` (WinRM, port 5985
+  HTTP with message encryption, 5986 HTTPS). A missing extra → clear message, only those targets
+  are skipped.
 - Input: a targets file, one target per line with its own method and credentials reference, e.g.
-  `10.0.5.12 ssh user=root key=~/.ssh/id_ed25519`, `DC01 winrm user=CORP\admin`,
-  `10.0.5.40 smb user=admin hash=<LM:NT>`. *(Builder's call, fixed now so the app and collector
-  agree.)* Format: UTF-8 text, one target per line, `#` comments, blank lines ignored; fields are
-  whitespace-separated: `<host> <method> [key=value ...]` with method `ssh|winrm|smb` and keys
-  `user`, `port`, `key`, `password-env`, `hash`, `domain`. The web app's targets export writes
-  `<ip> <method-guess> user=CHANGEME`, with the method guessed from the OS and listening ports
-  (22 → ssh, 5985/5986 → winrm, 445 → smb), and a header comment explaining the format.
-- Passwords are prompted or taken from environment variables; never written to disk or logs.
-  Hashes in the targets file are allowed (the operator's choice) and the docs warn about it.
-- Runs only read-only commands (the same collect commands as the app). `--dry-run` prints the plan.
-- Output: `<hostname>_netstat.txt` per target into an output folder, plus a summary of
-  successes/failures; one failure does not stop the run. Modest concurrency (builder's call).
-- Tests: parsing of the targets file, command construction, credential redaction in logs; remote
-  execution mocked.
+  `10.0.5.12 ssh user=root key=~/.ssh/id_ed25519`, `DC01 winrm user=admin domain=CORP
+  password-env=CORP_PW`. Format: UTF-8 text, one target per line, `#` comments (whole line or
+  after whitespace), blank lines ignored; fields are whitespace-separated:
+  `<host> <method> [key=value ...]` with method `ssh|winrm` and keys `user`, `port`, `key`,
+  `password-env`, `domain`. Any invalid line aborts the run before anything connects, listing every
+  bad line with its number. The web app's targets export writes `<ip> <method-guess> user=CHANGEME`,
+  with the method guessed from the ports the host serves (5985/5986 → winrm, 22 → ssh, Windows
+  ports 445/135/3389 → winrm with a comment that WinRM must be enabled), and a header comment
+  explaining the format.
+- WinRM passwords come from `password-env=NAME` or a prompt (asked once per user before the run
+  starts); never written to disk or logs. SSH takes no passwords. Every message that is printed is
+  scrubbed of known secret values.
+- Runs only read-only commands (the same collect commands as the app; one POSIX script that picks
+  `ss`/`netstat -W` on Linux and `netstat -anvW` on macOS by `uname`). `--dry-run` prints the plan
+  (targets, methods, ports, users, where each password comes from, the ssh command) and connects to
+  nothing.
+- Output: `<hostname>_netstat.txt` per target into an output folder (`--out`, default
+  `./netstat-files`), hostname from the returned header, made filesystem-safe, falling back to the
+  target name; an existing file is never overwritten (`_2`, `_3`, … suffix). Remote output is
+  untrusted: capped at 50 MB, written as bytes, never echoed to the terminal; remote error text is
+  stripped of control characters and truncated before it is shown. A summary lists successes and
+  failures; one failure does not stop the run; exit code 1 if any target failed. Concurrency: a
+  thread pool, `--workers` (default 8), per-target `--timeout` (default 120 s).
+- Tests (`python3 -m unittest discover -s collector`): parsing of the targets file, command
+  construction, credential redaction in logs, output naming; remote execution mocked.
 
 ## Test data (owner decision)
 

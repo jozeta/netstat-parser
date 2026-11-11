@@ -9,8 +9,7 @@ requests unless you switch on the optional DNS lookup.
 
 ![netstat-parser showing a synthetic network: subnets, the Internet group, risk-coloured connections and the details panel](docs/screenshot.png)
 
-**Status:** early development (2026-11-10). The web app is usable; the remote collector script is
-next. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
+**Status:** early development (2026-11-11). The web app and the collector script are usable. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
 
 ## Features
 
@@ -41,9 +40,10 @@ next. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/
   - a targets file listing uncollected hosts, for the collector
 - **"How to collect" page** with copy-ready commands per OS. Each command writes
   `<hostname>_netstat.txt` with a short header (hostname, IPs, OS, time).
-- **Collector script** (`collector/`, Python 3, *in progress*): gathers the same files remotely
-  over SSH, WinRM or SMB (password, key or hash) and saves them on your machine. It only runs
-  read-only commands and has a dry-run mode.
+- **Collector script** (`collector/`, Python 3): gathers the same files remotely over SSH (keys
+  or ssh-agent) or WinRM (password from an environment variable or a prompt) and saves them on
+  your machine. It only runs read-only commands and has a dry-run mode. See
+  [collector/README.md](collector/README.md).
 
 Job data is only kept in sessions you export yourself. The app does not auto-save it in the browser.
 
@@ -59,6 +59,9 @@ python3 -m http.server 8580      # then open http://localhost:8580/ (or: claude-
 3. Click hosts, groups or lines for details; search with `port:445 risk:red`, `collected:no`,
    `seen:one` and so on; name your subnets and tune the protocol risk table in **Settings**.
 4. **Export → Session** saves the job to reopen later (nothing is saved automatically).
+
+Many machines at once: export **Collector targets** from the graph, fill in users, then run
+`python3 collector/collect.py targets.txt --dry-run` and without `--dry-run` to collect.
 
 Try it without real data: `npm run gen:data` writes synthetic networks to `tests/data/generated/`.
 

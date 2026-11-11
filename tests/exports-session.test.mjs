@@ -37,9 +37,10 @@ test("targets file: seen-only internal hosts with a method guess", () => {
   const lines = t.split("\n").filter((l) => l && !l.startsWith("#"));
   assert.ok(t.startsWith("#"));
   assert.match(t, /<host> <method> \[key=value \.\.\.\]/);
-  assert.match(t, /ssh\|winrm\|smb/);
+  assert.match(t, /methods: ssh\|winrm\n/);
+  assert.doesNotMatch(t, /smb|hash/i);
   assert.deepEqual(lines.sort(), [
-    "10.10.1.10 smb user=CHANGEME",
+    "10.10.1.10 winrm user=CHANGEME  # Windows ports seen; WinRM must be enabled",
     "10.10.10.97 ssh user=CHANGEME  # method unknown",
     "10.10.10.98 winrm user=CHANGEME",
     "10.10.10.99 ssh user=CHANGEME",

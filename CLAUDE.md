@@ -8,7 +8,7 @@ A static, offline web app for pentesters and incident responders. It parses up t
 files (Windows / Linux / macOS) and draws an interactive network graph: hosts grouped by subnet,
 public IPs in an "Internet" cloud, and connections coloured by protocol risk. Solid lines mean seen
 from both ends, dashed means one end only, and hosts without a file are greyed out. A Python
-collector (`collector/`, built after the web app) gathers the files remotely.
+collector (`collector/`, SSH and WinRM only) gathers the files remotely.
 
 It is the successor to the owner's 2014 C# tool in `~/Desktop/NetstatParser/` (outside this repo,
 for reference only).
@@ -17,7 +17,7 @@ for reference only).
 before building anything.** It holds the goals and non-goals, the input formats, the graph model,
 the UI, settings, exports and the build order. Change the spec first if the behaviour changes.
 
-Status (2026-11-10): parsers, model and web UI built; the Python collector is next.
+Status (2026-11-11): parsers, model, web UI and the Python collector built.
 
 ## Commands
 
@@ -30,6 +30,7 @@ Tests:
 ```sh
 npm test            # node --test: tests/*.test.mjs
 npm run lint        # ESLint, including the unsafe-DOM rule
+npm run test:collector  # python3 unittest for collector/
 npm run gen:data    # write synthetic datasets to tests/data/generated/{small,medium,large} (gitignored)
 ```
 
@@ -61,7 +62,12 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 - `js/model/files.js`: unique file names within a batch or session
 - `vendor/cytoscape-3.34.4/`: Cytoscape.js (MIT). `css/cytoscape-container.css` has the id
   Cytoscape looks for, so it never injects a `<style>` (blocked by the CSP)
-- Planned: `collector/` (Python 3)
+- `collector/`: Python 3.9+, stdlib only except optional `pypsrp` for WinRM. `collect.py` is the
+  entry point; `npcollect/` holds `targets.py` (targets file parser), `remote.py` (ssh argv, WinRM
+  client), `collect.sh` / `collect.ps1` (the remote read-only scripts, kept in step with
+  `js/ui/collect-view.js` by `tests/collector-sync.test.mjs`), `output.py`, `redact.py`, `cli.py`.
+  Tests: `npm run test:collector` (unittest, remote execution mocked). No SMB exec or
+  pass-the-hash (owner decision 2026-11-11).
 
 ## Architecture rules
 

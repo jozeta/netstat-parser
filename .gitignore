@@ -38,8 +38,9 @@ tests/data/generated/
 # Real collected netstat files, wherever they are dropped (hand-written fixtures are the exception).
 *_netstat.txt
 !tests/fixtures/**
-# Collector output and targets files (targets can hold usernames and NTLM hashes).
+# Collector output and targets files (targets hold host lists and usernames).
 collector/output/
+netstat-files/
 targets*.txt
 !collector/targets.example.txt
 # App exports: sessions, CSVs, PNGs saved into the repo by mistake.

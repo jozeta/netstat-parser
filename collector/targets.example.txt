@@ -1,0 +1,9 @@
+# netstat-parser collector targets (example; the app's "Collector targets" export writes this format)
+# One target per line: <host> <method> [key=value ...]
+#   methods: ssh|winrm
+#   keys:    user port key password-env domain
+# Passwords are never stored here: use password-env=NAME or answer the prompt.
+10.0.5.12   ssh   user=root key=~/.ssh/id_ed25519
+web01       ssh   user=admin port=2222
+DC01        winrm user=admin domain=CORP password-env=CORP_PW
+10.0.5.40   winrm user=CORP\admin port=5986   # HTTPS listener

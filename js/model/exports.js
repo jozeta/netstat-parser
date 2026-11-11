@@ -41,12 +41,14 @@ export function hostsCsv(model) {
 
 const TARGETS_HEADER = `# netstat-parser collector targets
 # One target per line: <host> <method> [key=value ...]
-#   methods: ssh|winrm|smb
-#   keys:    user port key password-env hash domain
+#   methods: ssh|winrm
+#   keys:    user port key password-env domain
 # Passwords are never stored here: use password-env=NAME or answer the prompt.
 # Generated from hosts that appear in collected files but have no file of their own.
 # The method is a guess from the ports the host serves; check it before running.
 `;
+
+const WINDOWS_PORTS = [445, 135, 139, 3389];
 
 /** @param {object} model */
 export function targetsFile(model) {
@@ -60,8 +62,11 @@ export function targetsFile(model) {
     if (h.collected || !h.internal || !h.ips.length) continue;
     if (LINK_LOCAL.some((c) => inCidr(h.ips[0], c))) continue; // unusable without a scope id
     const p = served.get(h.id) ?? new Set();
-    const method = p.has(5985) || p.has(5986) ? "winrm" : p.has(445) ? "smb" : p.has(22) ? "ssh" : null;
-    lines.push(method ? `${h.ips[0]} ${method} user=CHANGEME` : `${h.ips[0]} ssh user=CHANGEME  # method unknown`);
+    const ip = h.ips[0];
+    if (p.has(5985) || p.has(5986)) lines.push(`${ip} winrm user=CHANGEME${p.has(5986) && !p.has(5985) ? " port=5986" : ""}`);
+    else if (p.has(22)) lines.push(`${ip} ssh user=CHANGEME`);
+    else if (WINDOWS_PORTS.some((x) => p.has(x))) lines.push(`${ip} winrm user=CHANGEME  # Windows ports seen; WinRM must be enabled`);
+    else lines.push(`${ip} ssh user=CHANGEME  # method unknown`);
   }
   return TARGETS_HEADER + lines.join("\n") + (lines.length ? "\n" : "");
 }

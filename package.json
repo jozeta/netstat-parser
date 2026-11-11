@@ -7,6 +7,7 @@
   "scripts": {
     "test": "node --test tests/",
     "lint": "eslint .",
+    "test:collector": "python3 -m unittest discover -s collector/tests -t collector",
     "gen:data": "node scripts/generate-datasets.js"
   },
   "devDependencies": {

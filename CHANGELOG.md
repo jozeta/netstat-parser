@@ -4,6 +4,11 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- Collector script (`collector/collect.py`, Python 3.9+): collects `<hostname>_netstat.txt` from
+  the hosts in a targets file over SSH (system `ssh`, keys or agent) or WinRM (optional `pypsrp`),
+  read-only commands only, `--dry-run`, passwords from environment variables or a prompt and
+  scrubbed from every message, never overwrites a file, one failure does not stop the run.
+- Collector targets export suggests `winrm` for Windows hosts (SMB is not a collection method).
 - Dark mode switch: System / Dark / Light in the sidebar, remembered in this browser and applied
   before the page draws; the graph recolours instantly.
 - Keyboard: expand or collapse any single group from the Hosts tab; the confirm dialog keeps focus
