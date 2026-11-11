@@ -8,7 +8,7 @@ const an = parseMacos(fx("macos-netstat-an.txt"));
 
 test("dotted endpoint established", () => {
   assert.deepEqual(an.records[0], { proto: "tcp", family: 4, localIp: "192.168.50.12", localPort: 52344,
-    remoteIp: "203.0.113.10", remotePort: 443, state: "ESTABLISHED" });
+    remoteIp: "140.82.112.3", remotePort: 443, state: "ESTABLISHED" });
 });
 
 test("tcp46 wildcard listen", () => {

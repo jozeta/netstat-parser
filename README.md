@@ -79,7 +79,9 @@ npm run lint        # ESLint, including the unsafe-DOM rule
 ```
 
 The test data is synthetic: a seeded generator builds small (20–40), medium (150–250) and large
-(300–400) computer networks. Real client data is never committed, and `.gitignore` keeps
+(300–400) computer networks. Its Internet addresses are well-known public services (GitHub,
+Google, Cloudflare, Quad9 and others) that have reverse DNS names, so **Resolve DNS** finds names
+on the demo data. Real client data is never committed, and `.gitignore` keeps
 `*_netstat.txt`, targets files, sessions and exports out of git.
 
 ## License

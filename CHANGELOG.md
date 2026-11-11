@@ -4,6 +4,10 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- Test data: the generated networks and the hand-written fixtures now use real public addresses
+  that have reverse DNS names (for example 8.8.8.8 → dns.google, 140.82.112.3 →
+  lb-140-82-112-3-iad.github.com) instead of documentation addresses, which DNS lookup skips.
+  Run `npm run gen:data` again to get the new files.
 - DNS: a **Resolve name** button in the details of each Internet host (disabled until DNS lookup
   is enabled); an optional automatic lookup after loading files; the "I understand public IPs are
   sent" acknowledgement is now its own setting, and until it is ticked every lookup asks first.

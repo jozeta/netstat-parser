@@ -323,7 +323,10 @@ data, and as performance checks:
 Each contains:
 - a mix of clients and servers (DC, file, DB, web, jump hosts)
 - several subnets
-- some hosts using online services
+- some hosts using online services. Their addresses are real, well-known public services that
+  have reverse DNS names (GitHub, Google, Cloudflare, Quad9, OpenDNS and so on), so the DNS
+  lookup can be tried on the demo data. Documentation ranges are not used, because the lookup
+  never sends them. This applies to the hand-written fixtures too.
 - a mix of Windows (English, Swedish and German), Linux (`netstat` and `ss`) and macOS output, with and without the header
 - risky and safe protocols
 - listening services

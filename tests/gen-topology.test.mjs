@@ -2,10 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildNetwork } from "../scripts/gen/topology.js";
 import { createRng } from "../scripts/gen/random.js";
+import { resolvePtrs } from "../js/model/dns.js";
+import { DEFAULT_INTERNAL_RANGES, inCidr } from "../js/lib/cidr.js";
 
 const RANGES = { small: [20, 40], medium: [150, 250], large: [300, 400] };
 const nets = Object.fromEntries(Object.keys(RANGES).map((s) => [s, buildNetwork(s, 1)]));
-const isPublic = (ip) => /^(192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|2001:db8:)/.test(ip);
+const isInternal = (ip) => DEFAULT_INTERNAL_RANGES.some((c) => inCidr(ip, c));
 const isLoop = (ip) => ip === "::1" || ip.startsWith("127.");
 
 test("createRng is deterministic", () => {
@@ -22,7 +24,7 @@ for (const [size, [lo, hi]] of Object.entries(RANGES)) {
 
   test(`${size}: internal computer count in ${lo}-${hi}`, () => {
     assert.ok(net.hosts.length >= lo && net.hosts.length <= hi, String(net.hosts.length));
-    assert.ok(net.hosts.every((h) => h.addresses.every((a) => !isPublic(a.ip))));
+    assert.ok(net.hosts.every((h) => h.addresses.every((a) => isInternal(a.ip))));
   });
 
   test(`${size}: every role present, devices never collected`, () => {
@@ -69,11 +71,18 @@ for (const [size, [lo, hi]] of Object.entries(RANGES)) {
     assert.ok(has(161, "udp"), "snmp");
   });
 
-  test(`${size}: online services in documentation ranges only, incl. IPv6`, () => {
-    const remotes = collected.flatMap((h) => h.sockets.map((r) => r.remoteIp)).filter((ip) => ip !== "*" && !isLoop(ip) && !byIp.has(ip));
+  test(`${size}: online services are real public addresses the DNS lookup sends`, async () => {
+    const remotes = [...new Set(collected.flatMap((h) => h.sockets.map((r) => r.remoteIp))
+      .filter((ip) => ip !== "*" && !isLoop(ip) && !byIp.has(ip)))];
     assert.ok(remotes.length > 0);
-    for (const ip of remotes) assert.ok(isPublic(ip), ip);
     assert.ok(remotes.some((ip) => ip.includes(":")), "an IPv6 online service");
+    const asked = new Set();
+    const fetch = async (url) => {
+      asked.add(new URL(url).searchParams.get("name"));
+      return { ok: true, json: async () => ({ Status: 3 }) };
+    };
+    const out = await resolvePtrs(remotes, { resolver: "cloudflare", fetch, delayMs: 0 });
+    assert.equal(asked.size, remotes.length, `not sent: ${remotes.filter((ip) => !(ip in out)).join(", ")}`);
   });
 
   test(`${size}: every collected host listens and has loopback traffic`, () => {

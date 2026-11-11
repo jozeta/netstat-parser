@@ -1,19 +1,39 @@
 // Builds a synthetic but realistic corporate network and, for every collected host, the exact
 // socket records its netstat file must parse to. Deterministic for a given (size, seed).
-// Public addresses come only from documentation ranges (RFC 5737 / RFC 3849).
+// Public addresses are real, well-known public services whose reverse DNS (PTR) answers, so the
+// app's DNS lookup has something to find (checked 2026-11-11; the name each one resolves to is beside
+// it). Documentation ranges (RFC 5737 / RFC 3849) are not used: the lookup never sends them.
 
 import { createRng } from "./random.js";
 
 const SIZES = { small: [20, 40], medium: [150, 250], large: [300, 400] };
 
 const PUBLIC = {
-  web: ["203.0.113.10", "203.0.113.25", "198.51.100.20", "203.0.113.61", "192.0.2.15"],
-  http: ["198.51.100.7", "192.0.2.80"],
-  mail: ["198.51.100.30"],
-  ftp: ["203.0.113.80"],
-  cloudSsh: ["192.0.2.44"],
-  v6: ["2001:db8:4860::8888", "2001:db8:1f::443"],
-  inbound: ["203.0.113.140", "198.51.100.201", "192.0.2.77", "203.0.113.199", "198.51.100.66"],
+  web: [
+    "140.82.112.3", //     lb-140-82-112-3-iad.github.com
+    "185.199.108.153", //  cdn-185-199-108-153.github.com
+    "185.199.109.153", //  cdn-185-199-109-153.github.com
+    "8.8.8.8", //          dns.google
+    "1.1.1.1", //          one.one.one.one
+  ],
+  http: [
+    "185.199.110.153", //  cdn-185-199-110-153.github.com
+    "185.199.111.153", //  cdn-185-199-111-153.github.com
+  ],
+  mail: ["64.233.184.27"], // wa-in-f27.1e100.net (Google mail)
+  ftp: ["193.166.3.2"], //   ftp.funet.fi
+  cloudSsh: ["140.82.121.4"], // lb-140-82-121-4-fra.github.com
+  v6: [
+    "2001:4860:4860::8888", // dns.google
+    "2606:4700:4700::1111", // one.one.one.one
+  ],
+  inbound: [
+    "9.9.9.9", //          dns9.quad9.net
+    "208.67.222.222", //   resolver1.opendns.com
+    "4.2.2.2", //          b.resolvers.level3.net
+    "94.140.14.14", //     dns.adguard-dns.com
+    "149.112.112.112", //  dns.quad9.net
+  ],
 };
 
 const OS_VERSIONS = {
