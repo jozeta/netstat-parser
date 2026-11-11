@@ -9,7 +9,24 @@ requests unless you switch on the optional DNS lookup.
 
 ![netstat-parser showing a synthetic network: subnets, the Internet group, risk-coloured connections and the details panel](docs/screenshot.png)
 
-**Status:** early development (2026-11-11). The web app and the collector script are usable. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
+**Version 0.2.0** (2026-11-11), the first public release. The web app and the collector script are
+usable; the collector's WinRM path and the collect commands have not yet been tried on real
+Windows and Linux machines. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
+The version is shown in the menu (top right) and by `python3 collector/collect.py --version`.
+
+## What's new in 0.2.0
+
+- **Analysis:** `process:` search, saved filters as chips, path finding between hosts, and a
+  neighbourhood view (1 or 2 hops around the selection).
+- **DNS:** a Resolve name button per Internet host and an optional automatic lookup after
+  loading; nodes no longer move when names arrive.
+- **Loading:** whole folders and `.zip` files; adding files asks whether to merge or start a new
+  job; the current job survives a reload (kept in this browser, can be turned off).
+- **Collector:** `collector/collect.py` gathers the files over SSH or WinRM.
+- **Look:** subnet groups and the Internet cloud as frosted glass; a top-right menu instead of the
+  sidebar.
+
+Older changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 

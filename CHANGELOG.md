@@ -4,6 +4,10 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+## 0.2.0 (2026-11-11)
+
+First public release.
+
 - Search: `process:` (e.g. `process:sshd`), and plain words also match process names. The
   connections CSV has `source_process` and `destination_process` columns.
 - Saved filters: save the current search under a name (**+** next to the search box); it appears

@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
 
-from . import remote
+from . import __version__, remote
 from .output import clean_message, host_from_header, safe_name, write_output
 from .redact import Redactor
 from .targets import parse_targets
@@ -22,6 +22,7 @@ def _parser():
         description="Collect <hostname>_netstat.txt files from the targets listed in a targets file "
                     "(the web app's 'Collector targets' export). Runs read-only commands only.")
     p.add_argument("targets", help="targets file: <host> <ssh|winrm> [user= port= key= password-env= domain=]")
+    p.add_argument("--version", action="version", version=f"netstat-parser collector {__version__}")
     p.add_argument("--out", default="netstat-files", help="output folder (default: ./netstat-files)")
     p.add_argument("--workers", type=int, default=8, help="targets collected at the same time (default 8)")
     p.add_argument("--timeout", type=int, default=120, help="seconds per target (default 120)")

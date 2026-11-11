@@ -7,6 +7,7 @@ import { connectionsCsv, hostsCsv, targetsFile } from "./model/exports.js";
 import { createSession, parseSession } from "./model/session.js";
 import { mergeSessionSettings, validateSettings, SAVED_FILTERS_MAX, SAVED_NAME_MAX } from "./model/settings.js";
 import { findPath, neighbourhood } from "./model/paths.js";
+import { VERSION } from "./version.js";
 import { resolveButton, shouldAutoResolve, loadChoice } from "./model/policy.js";
 import { MAX_FILE_BYTES, MAX_ARCHIVE_BYTES } from "./worker-core.js";
 import { isCandidate } from "./lib/inputs.js";
@@ -630,6 +631,7 @@ function init() {
   }
   window.addEventListener("resize", () => graph.resize());
   initTheme();
+  $("app-version").textContent = `netstat-parser ${VERSION}`;
   state.model = buildModel([], state.settings);
   rebuild();
   showView();

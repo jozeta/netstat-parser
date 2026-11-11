@@ -164,3 +164,14 @@ class Cli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Version(unittest.TestCase):
+    def test_version_flag_prints_the_package_version(self):
+        import contextlib
+        from npcollect import __version__
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as done:
+            main(["--version"])
+        self.assertEqual(done.exception.code, 0)
+        self.assertIn(__version__, out.getvalue())
