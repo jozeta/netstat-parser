@@ -7,6 +7,14 @@ const CELL_W = 130, CELL_H = 96, PAD = 60, GAP = 90, COLLAPSED_W = 150, COLLAPSE
 const gridSize = (n) => { const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.6))); return { cols, rows: Math.ceil(n / cols) }; };
 const cloudMargin = (w, h) => ({ x: Math.round(0.2 * w) + 10, top: Math.round(0.62 * h) + 10, bottom: Math.round(0.14 * h) + 10 });
 const ROLE_ORDER = { server: 0, both: 1, client: 2, unknown: 3 };
+// Sort key from things that never change for a host (never its label: a DNS answer would move it).
+// IPv4 in numeric order first, then IPv6, then the node id.
+const ipKey = (n) => {
+  const ip = String(n.data.ip ?? "");
+  const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(ip);
+  return v4 ? `4${v4.slice(1).map((o) => o.padStart(3, "0")).join(".")}` : ip ? `6${ip}` : `9${n.data.id}`;
+};
+const byKey = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * @param {{nodes: object[], edges: object[]}} els from toElements
@@ -26,7 +34,7 @@ export function groupedLayout({ nodes, edges }) {
     if (n.data.parent) continue;
     const kids = children.get(n.data.id);
     if (kids?.length) {
-      kids.sort((a, b) => (ROLE_ORDER[a.data.role] ?? 9) - (ROLE_ORDER[b.data.role] ?? 9) || (degree.get(b.data.id) ?? 0) - (degree.get(a.data.id) ?? 0) || String(a.data.label).localeCompare(String(b.data.label)));
+      kids.sort((a, b) => (ROLE_ORDER[a.data.role] ?? 9) - (ROLE_ORDER[b.data.role] ?? 9) || (degree.get(b.data.id) ?? 0) - (degree.get(a.data.id) ?? 0) || byKey(ipKey(a), ipKey(b)) || byKey(a.data.id, b.data.id));
       const { cols, rows } = gridSize(kids.length);
       const internet = n.data.kind === "internet";
       const w = cols * CELL_W + PAD, h = rows * CELL_H + PAD;

@@ -42,8 +42,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
   graph: { expandUpTo: 30, labels: true }, // groups with up to N hosts start expanded
   // acknowledged: the user accepted that public IPs go to the resolver; auto: look up after loading
   dns: { enabled: false, resolver: null, acknowledged: false, auto: false },
-  // when files are loaded into a job that already has files: ask, merge or start a new job
-  load: { onMore: "ask" },
+  // when files are loaded into a job that already has files: ask, merge or start a new job.
+  // keepJob: keep the current job in this browser (IndexedDB) so a reload does not lose it
+  load: { onMore: "ask", keepJob: true },
 });
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -118,8 +119,11 @@ export function validateSettings(input, { legacy = false } = {}) {
     const acknowledged = input.dns.acknowledged === true || (legacy && enabled && !("acknowledged" in input.dns));
     out.dns = { enabled, resolver, acknowledged, auto: enabled && acknowledged && input.dns.auto === true };
   }
-  if (input.load && typeof input.load === "object" && ["ask", "merge", "new"].includes(input.load.onMore)) {
-    out.load = { onMore: input.load.onMore };
+  if (input.load && typeof input.load === "object") {
+    out.load = {
+      onMore: ["ask", "merge", "new"].includes(input.load.onMore) ? input.load.onMore : DEFAULT_SETTINGS.load.onMore,
+      keepJob: input.load.keepJob !== false,
+    };
   }
   return out;
 }

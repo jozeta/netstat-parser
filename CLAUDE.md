@@ -86,8 +86,10 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
   in English, Swedish and German.
 - The edge port is the **service port**: the listening port if known, else the lower or
   well-known one. Never use the local port blindly; that was the old tool's bug.
-- Job data lives in memory and in exported session files only. `localStorage` holds
-  **settings only**.
+- Job data lives in memory, in exported session files, and (setting `load.keepJob`, default on)
+  in one IndexedDB record so a reload keeps it (`js/model/saved-job.js` + `js/ui/job-db.js`; read
+  back as untrusted, like a session). `localStorage` holds **settings only**.
+- The layout must not depend on labels (DNS names would move nodes): sort by stable keys.
 - The CSP stays strict. The only allowed exception is `connect-src` for the fixed DNS-over-HTTPS
   resolvers (Cloudflare, Google, Quad9), used for the opt-in DNS lookup. That waiver must be
   recorded in `.claude-standards` when it lands.

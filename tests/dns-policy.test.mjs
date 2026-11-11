@@ -8,7 +8,7 @@ const S = (dns = {}, load) => validateSettings({ dns, ...(load ? { load } : {}) 
 
 test("DNS and loading defaults", () => {
   assert.deepEqual(DEFAULT_SETTINGS.dns, { enabled: false, resolver: null, acknowledged: false, auto: false });
-  assert.deepEqual(DEFAULT_SETTINGS.load, { onMore: "ask" });
+  assert.deepEqual(DEFAULT_SETTINGS.load, { onMore: "ask", keepJob: true });
 });
 
 test("DNS settings: enabling needs a resolver, not the acknowledgement; auto needs both", () => {
@@ -30,9 +30,16 @@ test("load.onMore accepts ask, merge, new only", () => {
   assert.equal(S({}, { onMore: "replace" }).load.onMore, "ask");
 });
 
+test("load.keepJob is a boolean, on unless explicitly false", () => {
+  assert.equal(S({}, { onMore: "ask", keepJob: false }).load.keepJob, false);
+  assert.equal(S({}, { onMore: "ask", keepJob: "no" }).load.keepJob, true);
+  assert.equal(S({}, { onMore: "merge" }).load.keepJob, true);
+  assert.equal(S({}, { keepJob: false }).load.keepJob, false); // without onMore
+});
+
 test("a session never changes the user's DNS or loading preferences", () => {
-  const current = S({ enabled: true, resolver: "google", acknowledged: true, auto: true }, { onMore: "merge" });
-  const fromSession = S({ enabled: false }, { onMore: "new" });
+  const current = S({ enabled: true, resolver: "google", acknowledged: true, auto: true }, { onMore: "merge", keepJob: false });
+  const fromSession = S({ enabled: false }, { onMore: "new", keepJob: true });
   const m = mergeSessionSettings(current, fromSession);
   assert.deepEqual(m.dns, current.dns);
   assert.deepEqual(m.load, current.load);

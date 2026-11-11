@@ -4,6 +4,11 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- The current job survives a reload or a closed tab: it is kept in this browser (IndexedDB) until
+  you start a new job. New setting "Keep the current job in this browser" (on); turning it off
+  deletes the kept copy. The leave-page warning now only appears when the job is not kept.
+- Resolving DNS names no longer moves nodes: hosts in a group were sorted by their label, which a
+  DNS answer changes. They are now ordered by address.
 - Test data: the generated networks and the hand-written fixtures now use real public addresses
   that have reverse DNS names (for example 8.8.8.8 → dns.google, 140.82.112.3 →
   lb-140-82-112-3-iad.github.com) instead of documentation addresses, which DNS lookup skips.

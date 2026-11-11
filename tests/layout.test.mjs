@@ -53,3 +53,15 @@ test("the Internet group reserves room for its cloud outline", () => {
   const gap = (kind) => { const p = groupedLayout(els(kind)); return Math.hypot(p.b1.x - p.a1.x, p.b1.y - p.a1.y); };
   assert.ok(gap("internet") >= gap("subnet") + 40, `${gap("internet")} vs ${gap("subnet")}`);
 });
+
+test("DNS names (label changes) never move a node: the layout ignores labels", () => {
+  const before = groupedLayout(toElements(model, opts));
+  // name every Internet host, in an order unrelated to its address
+  const dns = {};
+  let i = 0;
+  for (const h of model.hosts.values()) if (h.groupId === "g:internet") dns[h.ips[0]] = `${String.fromCharCode(122 - (i++ % 26))}-name.example`;
+  assert.ok(Object.keys(dns).length > 2);
+  const after = groupedLayout(toElements(model, { ...opts, dns }));
+  assert.deepEqual(after, before);
+  assert.deepEqual(groupedLayout(toElements(model, { ...opts, labels: false })), before);
+});

@@ -222,14 +222,15 @@ added to it.
 
 ### Settings
 
-Stored in `localStorage` (settings only, never job data), with export/import as JSON and
+Stored in `localStorage` (settings only; the job itself is kept separately, see Data handling), with export/import as JSON and
 "reset to defaults":
 - Protocol table: port, proto, name, risk level (add / edit / remove).
 - Subnets: CIDR → name; also which ranges count as internal.
 - Role rules (tag name → required listening ports).
 - Graph: expand groups with up to N hosts (default 30), labels on/off.
 - DNS lookup (below): enable, resolver, acknowledgement, automatic lookup after loading.
-- Loading: what to do when files are added to a job that already has files (ask / merge / new job).
+- Loading: what to do when files are added to a job that already has files (ask / merge / new job),
+  and whether to keep the current job in this browser (default on).
 
 ### DNS lookup (opt-in, browser)
 
@@ -255,7 +256,14 @@ Stored in `localStorage` (settings only, never job data), with export/import as 
 
 ### Data handling and exports
 
-- Job data lives in memory and in exported files only — no auto-save to browser storage.
+- **The current job is kept in this browser** (owner decision 2026-11-11), so a reload or a closed
+  tab does not lose it: one IndexedDB record, saved shortly after every change, in the session
+  format, read back through the same validation as an imported session. It stays on this computer
+  until a new job is started or the setting "Keep the current job in this browser" is turned off
+  (which deletes it). `localStorage` still holds settings only. The unsaved-work warning only
+  appears when the job is not kept (setting off, storage blocked or full, or a save still pending).
+- Layout never depends on labels: hosts in a group are ordered by role, number of connections,
+  then address. A DNS answer changes a label but never moves a node.
 - **Session export/import** (`.json`, versioned schema): parsed records, host identities, settings
   snapshot, subnet names, DNS results, node positions, expanded/collapsed state. Import validates
   the schema and treats the file as untrusted.

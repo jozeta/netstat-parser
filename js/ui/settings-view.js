@@ -71,6 +71,8 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
   dnsOn.addEventListener("change", syncAuto);
   ack.addEventListener("change", syncAuto);
   syncAuto();
+  const keepJob = el("input", { type: "checkbox", class: "lg-toggle", id: "keep-job" });
+  keepJob.checked = settings.load.keepJob;
   const onMore = select(settings.load.onMore, [["ask", "Ask every time"], ["merge", "Add them to the current job"], ["new", "Start a new job"]], { id: "load-on-more" });
 
   const tbody = (t) => t.querySelector("tbody");
@@ -104,7 +106,7 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
     if (dnsOn.checked && !resolver.value) { bad++; resolver.classList.add("np-invalid"); }
     return { bad, next: { protocols, subnets, internalRanges: okRanges, roleRules, graph: { expandUpTo: t, labels: labels.checked },
       dns: { enabled: dnsOn.checked, resolver: resolver.value || null, acknowledged: ack.checked, auto: auto.checked },
-      load: { onMore: onMore.value } } };
+      load: { onMore: onMore.value, keepJob: keepJob.checked } } };
   }
 
   const save = () => {
@@ -160,8 +162,10 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
       el("label", { class: "np-inline", for: "dns-auto" }, auto, "Look up Internet addresses automatically after loading files"),
       el("span", { class: "lg-small lg-muted" }, "Needs DNS lookup enabled and the box above ticked.")),
     el("section", { class: "lg-card lg-stack", "aria-labelledby": "s-load" },
-      el("h2", { class: "lg-subtitle", id: "s-load" }, "Loading more files"),
-      el("div", { class: "lg-field" }, el("label", { for: "load-on-more" }, "When files are loaded and a job already has files"), onMore)),
+      el("h2", { class: "lg-subtitle", id: "s-load" }, "Loading and keeping files"),
+      el("div", { class: "lg-field" }, el("label", { for: "load-on-more" }, "When files are loaded and a job already has files"), onMore),
+      el("label", { class: "np-inline", for: "keep-job" }, keepJob, "Keep the current job in this browser"),
+      el("span", { class: "lg-small lg-muted" }, "A reload or a closed tab does not lose the job. It is stored on this computer, in this browser only, until you start a new job or turn this off (turning it off deletes it). Nothing is uploaded.")),
     el("div", { class: "lg-row np-settings-actions" },
       el("button", { class: "lg-btn lg-btn-primary", type: "button", onclick: save }, "Save settings"),
       el("button", { class: "lg-btn", type: "button", onclick: () => { onSave(validateSettings(DEFAULT_SETTINGS)); renderSettings(root, validateSettings(DEFAULT_SETTINGS), { onSave, toast, current }); toast("Settings reset to defaults."); } }, "Reset to defaults"),

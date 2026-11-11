@@ -17,6 +17,8 @@ import { createGraph } from "./ui/graph.js";
 import { hostDetails, groupDetails, edgeDetails, mergedDetails, hostsList, groupsList, filesList } from "./ui/panel.js";
 import { el, replace, download } from "./ui/dom.js";
 import { loadSettings, saveSettings } from "./ui/storage.js";
+import { readJob, writeJob, clearJob } from "./ui/job-db.js";
+import { toSaved, fromSaved } from "./model/saved-job.js";
 import { renderSettings } from "./ui/settings-view.js";
 import { renderCollect } from "./ui/collect-view.js";
 import { readTheme, writeTheme, applyTheme } from "./ui/theme.js";
@@ -95,8 +97,42 @@ function askDialog(text, { ok: okLabel = "Continue", alt: altLabel = null, title
 }
 const confirmDialog = (text, okLabel = "Continue") => askDialog(text, { ok: okLabel }).then((v) => v === "ok");
 
-function setDirty(v = true) { state.dirty = v && state.files.length > 0; }
-window.addEventListener("beforeunload", (ev) => { if (state.dirty) { ev.preventDefault(); ev.returnValue = ""; } });
+function setDirty(v = true) { state.dirty = v && state.files.length > 0; scheduleSave(); }
+// a job kept in the browser survives a reload, so only warn while a save is still on its way
+window.addEventListener("beforeunload", (ev) => {
+  if (state.dirty && !(state.settings.load.keepJob && !savePending)) { ev.preventDefault(); ev.returnValue = ""; }
+});
+
+// ---------- keeping the job across reloads (Settings → load.keepJob) ----------
+let saveTimer = null, savePending = false, saveChain = Promise.resolve(), saveWarned = false;
+function scheduleSave() {
+  if (!state.settings.load.keepJob) return;
+  savePending = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; saveChain = saveChain.then(saveJobNow); }, 400);
+}
+async function saveJobNow() {
+  // writes run one after another, so an older job can never overwrite a newer one
+  const r = state.files.length && state.settings.load.keepJob
+    ? await writeJob(toSaved({ files: state.files, settings: state.settings, dns: state.dns, positions: state.positions, collapsed: state.collapsed, dirty: state.dirty }))
+    : await clearJob();
+  savePending = saveTimer !== null;
+  if (r.ok) saveWarned = false;
+  else if (state.files.length && !saveWarned) {
+    saveWarned = true;
+    toast("This job could not be kept in the browser (storage full or blocked), so a reload loses it. Export a session to keep it.", "warn", 10000);
+  }
+}
+async function restoreSavedJob() {
+  if (!state.settings.load.keepJob) return;
+  const gen = generation;
+  const back = fromSaved(await readJob(), state.settings);
+  if (!back || gen !== generation || state.files.length) return; // nothing kept, or the user already started
+  Object.assign(state, { ...back, known: new Set(), selected: null });
+  $("dns-btn").hidden = !state.settings.dns.enabled;
+  rebuild({ adopt: true });
+  toast(`Job restored: ${count(state.files.length, "file")}.`);
+}
 
 // ---------- views ----------
 function showView() {
@@ -113,7 +149,9 @@ window.addEventListener("hashchange", showView);
 
 function applySettings(next) {
   if (next.graph.expandUpTo !== state.settings.graph.expandUpTo) state.known = new Set(); // re-apply to every group
+  const forget = state.settings.load.keepJob && !next.load.keepJob;
   state.settings = next;
+  if (forget) { clearTimeout(saveTimer); saveTimer = null; saveChain = saveChain.then(saveJobNow); } // clears the kept job
   if (!saveSettings(storage, next)) toast("Settings could not be stored in this browser (private mode?). They apply until you reload.", "warn");
   $("dns-btn").hidden = !next.dns.enabled;
   setDirty();
@@ -508,6 +546,7 @@ function init() {
   state.model = buildModel([], state.settings);
   rebuild();
   showView();
+  restoreSavedJob();
 }
 
 function initTheme() {

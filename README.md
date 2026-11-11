@@ -35,6 +35,9 @@ requests unless you switch on the optional DNS lookup.
   **Resolve name** button in an Internet host's details looks up just that one, and an optional
   setting does it automatically after loading. Until you tick "I understand that public IP
   addresses are sent", every lookup asks first. Internal and documentation addresses are never sent.
+- **Survives a reload:** the current job (files, layout, DNS names, expanded groups) is kept in
+  this browser until you start a new job. Turn it off in Settings → "Keep the current job in this
+  browser" (this also deletes the kept copy). Nothing is uploaded.
 - **Dark and light themes:** follows your system, or pick Dark or Light in the menu (top right).
 - **Exports:**
   - PNG
