@@ -11,7 +11,7 @@
     "gen:data": "node scripts/generate-datasets.js"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.0",
+    "@eslint/js": "^10.0.1",
     "eslint": "^9.39.0",
     "eslint-plugin-no-unsanitized": "^4.1.4"
   }
