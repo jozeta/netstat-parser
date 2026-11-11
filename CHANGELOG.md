@@ -8,6 +8,8 @@ All notable changes to netstat-parser are listed here, newest first.
 
 First public release.
 
+- Development: ESLint 10 (with `minimatch` 11, which fixes a denial-of-service advisory), CI on
+  `actions/checkout` and `actions/setup-node` v7, collector tests in the `python:3.9-slim` container.
 - Search: `process:` (e.g. `process:sshd`), and plain words also match process names. The
   connections CSV has `source_process` and `destination_process` columns.
 - Saved filters: save the current search under a name (**+** next to the search box); it appears
