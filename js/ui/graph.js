@@ -1,7 +1,7 @@
 // Cytoscape wrapper: stylesheet from CSS tokens, layout, selection, PNG export.
 import cytoscape from "../../vendor/cytoscape-3.34.4/cytoscape.esm.min.mjs";
 import { groupedLayout } from "./layout.js";
-import { cloudImage, osIcon, OS_LIST } from "./icons.js";
+import { cloudImage, grainTile, osIcon, OS_LIST } from "./icons.js";
 
 const token = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
@@ -15,8 +15,19 @@ function stylesheet(large = false) {
   const text = token("--np-node-text", "#e8edf5");
   const select = token("--np-select", "#7cc4ff");
   const font = token("--lg-font", "system-ui, sans-serif");
+  const num = (name, fallback) => { const v = Number(token(name, "")); return Number.isFinite(v) && token(name, "") !== "" ? v : fallback; };
+  // Frosted glass. A canvas cannot blur what lies behind a shape, so the effect is built from what
+  // it can draw: a translucent tint that is lighter at the top (sheen), a fine grain, a bright edge
+  // with a dark hairline outside it, and a faint shadow.
+  const glass = {
+    tint: token("--np-glass-tint", "#7896c8"), alpha: num("--np-glass-alpha", 0.13), sheen: token("--np-glass-sheen", "#ffffff"),
+    edge: token("--np-glass-edge", "#dfe9fb"), edgeAlpha: num("--np-glass-edge-alpha", 0.3),
+    outline: token("--np-glass-outline", "#05080e"), outlineAlpha: num("--np-glass-outline-alpha", 0.45),
+    grain: num("--np-glass-grain", 0.45), shadow: token("--np-glass-shadow", "#000000"), shadowAlpha: num("--np-glass-shadow-alpha", 0.16),
+  };
   const cloud = cloudImage(token("--np-internet", "#5aaaff"), token("--np-internet-border", token("--np-group-border", "#6a7f9f")),
-    Number(token("--np-internet-alpha", ".12")) * 1.4);
+    Number(token("--np-internet-alpha", ".12")) * 1.4, { sheen: glass.sheen, grain: glass.grain });
+  const grain = grainTile(glass.grain);
   return [
     { selector: "node", style: { label: "data(label)", color: text, "font-family": font, "font-size": 10, "text-wrap": "wrap",
       "text-max-width": 140, "min-zoomed-font-size": 5, "text-outline-width": 0 } },
@@ -32,20 +43,29 @@ function stylesheet(large = false) {
     { selector: 'node.host[border = "safe"]', style: { "border-color": risk.safe } },
     { selector: 'node.host[border = "unclassified"]', style: { "border-color": risk.unclassified } },
     { selector: "node.seen-only", style: { "background-color": token("--np-node-seen", "#3a3f48"), opacity: 0.55, "border-style": "dashed" } },
-    { selector: "node.group", style: { shape: "round-rectangle", "background-color": token("--np-group", "#7896c8"),
-      "background-opacity": Number(token("--np-group-alpha", ".1")), "border-width": 1, "border-color": token("--np-group-border", "#556"), "text-valign": "top",
+    { selector: "node.group", style: { shape: "round-rectangle", "corner-radius": 18, "background-color": glass.tint,
+      "background-fill": "linear-gradient", "background-gradient-direction": "to-bottom",
+      "background-gradient-stop-colors": `${glass.sheen} ${glass.tint} ${glass.tint}`, "background-gradient-stop-positions": "0 40 100",
+      "background-opacity": glass.alpha,
+      "background-image": grain, "background-repeat": "repeat", "background-fit": "none", "background-width": 96, "background-height": 96,
+      "background-clip": "node", "background-image-opacity": 1, "background-image-containment": "inside",
+      "border-width": 1, "border-color": glass.edge, "border-opacity": glass.edgeAlpha,
+      "outline-width": 1, "outline-color": glass.outline, "outline-opacity": glass.outlineAlpha, "outline-offset": 0,
+      "underlay-color": glass.shadow, "underlay-opacity": glass.shadowAlpha, "underlay-padding": 3, "underlay-shape": "round-rectangle", "underlay-corner-radius": 21,
+      "text-valign": "top",
       "text-halign": "center", "font-size": 15, "font-weight": 600, padding: 14, "text-margin-y": -4, "min-zoomed-font-size": 0,
       "text-background-color": token("--np-label-bg", "#141a24"), "text-background-opacity": 0.75, "text-background-padding": 3,
       "text-background-shape": "round-rectangle" } },
     // The Internet group is a cloud image (the CSP allows data: images) on an invisible box. The
     // image is 138 % x 174 % of the box and shifted up, so the box lands on the cloud's safe area
     // (icons.js) and the lobes rise above the hosts; the label sits in the dome.
-    { selector: "node.internet", style: { "background-opacity": 0, "border-width": 0, "background-image": cloud,
+    { selector: "node.internet", style: { "background-opacity": 0, "border-width": 0, "outline-width": 0, "underlay-opacity": 0, "background-image": cloud,
+      "background-repeat": "no-repeat", "background-image-opacity": 1,
       "background-fit": "none", "background-width": "138.3%", "background-height": "173.9%", "background-position-x": "50%",
       "background-position-y": "82.4%", "background-clip": "none", "background-image-containment": "over",
       "bounds-expansion": (ele) => Math.ceil(0.62 * ele.height()) + 4, "text-margin-y": (ele) => -Math.round(0.3 * ele.height()), "font-size": 16, "font-weight": 700,
       color: token("--np-internet-text", text), "text-background-opacity": 0 } },
-    { selector: "node.collapsed", style: { "background-opacity": 0.35 } },
+    { selector: "node.collapsed", style: { "background-opacity": Math.min(1, glass.alpha * 2.2) } },
     { selector: "node.collapsed", style: { width: 140, height: 76, "text-valign": "center", "font-size": 14, "text-max-width": 130 } },
     { selector: "node.collapsed.internet", style: { shape: "round-rectangle", width: 160, height: 98, "background-opacity": 0,
       "background-width": "100%", "background-height": "100%", "background-position-y": "50%", "bounds-expansion": 0,

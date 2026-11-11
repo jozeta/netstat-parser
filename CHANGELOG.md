@@ -4,6 +4,8 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- Subnet groups and the Internet cloud look like frosted glass: a translucent tint with a light
+  sheen from the top, a fine grain, a bright rim and a soft shadow, tuned for dark and light.
 - The current job survives a reload or a closed tab: it is kept in this browser (IndexedDB) until
   you start a new job. New setting "Keep the current job in this browser" (on); turning it off
   deletes the kept copy. The leave-page warning now only appears when the job is not kept.

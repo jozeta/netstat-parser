@@ -20,6 +20,17 @@
   --np-internet-border: #6fa8e6;
   --np-internet-text: #bcdcff;
   --np-label-bg: #141a24;
+  /* frosted glass for groups and the cloud (graph.js): tint, sheen, edge, grain, shadow */
+  --np-glass-tint: #7896c8;
+  --np-glass-alpha: .13;
+  --np-glass-sheen: #ffffff;
+  --np-glass-edge: #dfe9fb;
+  --np-glass-edge-alpha: .3;
+  --np-glass-outline: #05080e;
+  --np-glass-outline-alpha: .45;
+  --np-glass-grain: .22;
+  --np-glass-shadow: #000000;
+  --np-glass-shadow-alpha: .12;
   --np-select: #7cc4ff;
   --np-icon: #a9bddb;
 }
@@ -40,6 +51,16 @@
     --np-internet-border: #6d9bd6;
     --np-internet-text: #0d4f9e;
     --np-label-bg: #f4f7fb;
+    --np-glass-tint: #c9d8ee;
+    --np-glass-alpha: .5;
+    --np-glass-sheen: #ffffff;
+    --np-glass-edge: #ffffff;
+    --np-glass-edge-alpha: .95;
+    --np-glass-outline: #8ea0bd;
+    --np-glass-outline-alpha: .55;
+    --np-glass-grain: .18;
+    --np-glass-shadow: #1c2b45;
+    --np-glass-shadow-alpha: .045;
     --np-select: #0b6bcb;
     --np-icon: #3d5578;
   }
@@ -60,6 +81,16 @@
   --np-internet-border: #6d9bd6;
   --np-internet-text: #0d4f9e;
   --np-label-bg: #f4f7fb;
+  --np-glass-tint: #c9d8ee;
+  --np-glass-alpha: .5;
+  --np-glass-sheen: #ffffff;
+  --np-glass-edge: #ffffff;
+  --np-glass-edge-alpha: .95;
+  --np-glass-outline: #8ea0bd;
+  --np-glass-outline-alpha: .55;
+  --np-glass-grain: .18;
+  --np-glass-shadow: #1c2b45;
+  --np-glass-shadow-alpha: .045;
   --np-select: #0b6bcb;
   --np-icon: #3d5578;
 }
