@@ -2,7 +2,17 @@
 // Files picked one by one are always parsed; this filter is for folders and archives only.
 import { unzip } from "./zip.js";
 
-const TEXT_EXTENSIONS = new Set(["txt", "log", "out"]);
+// A name whose last dot-part is not one of these is taken as extension-less, so "10.0.0.5" and
+// "web01.corp.local" (host-named files) are parsed.
+const NOT_NETSTAT_EXTENSIONS = new Set([
+  "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp", "tif", "tiff", "heic",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "pages", "numbers", "key",
+  "zip", "7z", "rar", "gz", "tgz", "bz2", "xz", "tar", "cab", "iso", "img", "dmg",
+  "exe", "dll", "sys", "msi", "bin", "so", "dylib", "o", "class", "jar", "pyc", "lnk",
+  "json", "csv", "tsv", "xml", "html", "htm", "js", "mjs", "css", "md", "yml", "yaml",
+  "py", "sh", "ps1", "bat", "cmd", "evtx", "pcap", "pcapng", "db", "sqlite", "plist", "ini",
+  "mp3", "mp4", "mov", "avi", "wav", "mkv",
+]);
 const baseName = (path) => String(path).split(/[\\/]/).pop();
 
 /** @param {string} path a name or a path inside a folder or archive */
@@ -13,7 +23,7 @@ export function isCandidate(path) {
   if (!base || base.startsWith(".")) return false; // .DS_Store, ._* forks, hidden files
   if (/^(thumbs\.db|desktop\.ini)$/i.test(base)) return false;
   const dot = base.lastIndexOf(".");
-  return dot < 1 || TEXT_EXTENSIONS.has(base.slice(dot + 1).toLowerCase());
+  return dot < 1 || !NOT_NETSTAT_EXTENSIONS.has(base.slice(dot + 1).toLowerCase());
 }
 
 /** @param {string} name @param {Uint8Array} bytes */

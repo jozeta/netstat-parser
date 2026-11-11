@@ -171,6 +171,7 @@ export function mergeSessionSettings(current, fromSession) {
   merged.dns = clone(current.dns);
   merged.load = clone(current.load); // a preference of this user, not of the job
   merged.savedFilters = clone(current.savedFilters);
-  merged.internalRanges = [...new Set([...current.internalRanges, ...fromSession.internalRanges])];
+  // the user's own subnets are internal to them too (buildModel treats them so), so keep them protected
+  merged.internalRanges = [...new Set([...current.internalRanges, ...current.subnets.map((x) => x.cidr), ...fromSession.internalRanges])];
   return validateSettings(merged);
 }

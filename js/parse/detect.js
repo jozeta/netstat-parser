@@ -1,9 +1,13 @@
 // Detect the netstat flavour from the shape of its socket lines (never from header words,
 // which Windows translates).
 
+import { SS_STATE, MAX_LINE } from "./common.js";
+
 const SHAPES = [
   // order = tie-break priority
   ["linux-ss", /^(tcp|udp)\s+[A-Z][A-Z0-9-]*\s+\d+\s+\d+\s+\S+:\S+\s+\S+:\S+/],
+  // `ss -tanp` / `-uanp`: no Netid column, the line starts with the state
+  ["linux-ss", /^[A-Z][A-Z0-9-]*\s+\d+\s+\d+\s+\S+:\S+\s+\S+:\S+/],
   ["macos", /^(tcp|udp)(4|6|46)\s+\d+\s+\d+\s+\S+\.(\d+|\*)\s+\S+\.(\d+|\*)/],
   ["linux-netstat", /^(tcp|udp)6?\s+\d+\s+\d+\s+\S+:(\d+|\*)\s+\S+:(\d+|\*)/],
   ["windows", /^(TCP|UDP)\s+\S+:\d+\s+\S+:(\d+|\*)/],
@@ -18,8 +22,9 @@ export function detectFormat(body) {
   const counts = new Map(SHAPES.map(([name]) => [name, 0]));
   let seen = 0;
   for (const raw of body.split(/\r\n|\r|\n/)) {
+    if (raw.length > MAX_LINE) continue;
     const line = raw.trim();
-    if (!/^(tcp|udp)/i.test(line)) continue;
+    if (!/^(tcp|udp)/i.test(line) && !SS_STATE.test(line.split(/\s/, 1)[0])) continue;
     for (const [name, re] of SHAPES) if (re.test(line)) counts.set(name, counts.get(name) + 1);
     if (++seen >= MAX_CANDIDATES) break;
   }

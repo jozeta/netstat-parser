@@ -66,7 +66,13 @@ def run_ssh(t: Target, *, accept_new: bool, timeout: float, popen=subprocess.Pop
                 return
 
     def read_err():
-        err.extend(proc.stderr.read(65536))  # the first 64 kB of error text is plenty
+        # keep draining until EOF so a chatty ssh never blocks on a full pipe; keep only the first 64 kB
+        while True:
+            chunk = proc.stderr.read(65536)
+            if not chunk:
+                return
+            if len(err) < 65536:
+                err.extend(chunk[: 65536 - len(err)])
 
     readers = [threading.Thread(target=read_out, daemon=True), threading.Thread(target=read_err, daemon=True)]
     for r in readers:

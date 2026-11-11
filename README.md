@@ -26,24 +26,29 @@ offline instead, see [Getting started](#getting-started).
 
 All screenshots use the synthetic test networks (`npm run gen:data`), never real data.
 
-**Version 0.2.0** (2026-11-11), the first public release. The web app and the collector script are
-usable; the collector's WinRM path and the collect commands have not yet been tried on real
-Windows and Linux machines. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
+**Version 0.2.1** (2026-11-11), a bug-fix release after the first public one (0.2.0). The web app
+and the collector script are usable; the collector's WinRM path and the collect commands have not
+yet been tried on real Windows and Linux machines. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
 The version is shown in the menu (top right) and by `python3 collector/collect.py --version`.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-- **Analysis:** `process:` search, saved filters as chips, path finding between hosts, and a
-  neighbourhood view (1 or 2 hops around the selection).
-- **DNS:** a Resolve name button per Internet host and an optional automatic lookup after
-  loading; nodes no longer move when names arrive.
-- **Loading:** whole folders and `.zip` files; adding files asks whether to merge or start a new
-  job; the current job survives a reload (kept in this browser, can be turned off).
-- **Collector:** `collector/collect.py` gathers the files over SSH or WinRM.
-- **Look:** subnet groups and the Internet cloud as frosted glass; a top-right menu instead of the
-  sidebar.
+- **Privacy:** DNS lookup no longer sends private addresses written in IPv6 form (such as
+  `::10.0.0.5`) or other reserved ranges; your named subnets stay protected after opening a
+  session; DNS answers from an old job never land in a new one; a session's settings are no
+  longer stored as your own.
+- **Keeping the job:** a failed or empty "Start new job" load keeps the current job; two open tabs
+  no longer overwrite each other's kept job, and a closed tab's job still comes back.
+- **Parsing:** more formats (`ss -tanp`/`-uanp`, Linux `netstat -tunaep`, Windows `netstat -anot`),
+  host names from file names such as `10.0.0.5` kept whole, machines with the same short name in
+  different domains kept apart, Docker bridges no longer decide a host's subnet.
+- **Robustness:** hostile files and zips can no longer stall parsing; one unreadable item no longer
+  fails a whole folder drop; the collector survives noisy ssh output and odd target lines.
+- **Search:** plain words such as `445` or `smb` now also match the hosts on those connections.
+- The app is also online at <https://jozeta.github.io/netstat-parser/>.
 
-Older changes: [CHANGELOG.md](CHANGELOG.md).
+Full list: [CHANGELOG.md](CHANGELOG.md).
+
 
 ## Features
 

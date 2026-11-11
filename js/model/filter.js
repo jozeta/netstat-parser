@@ -1,5 +1,5 @@
 // Search and filter: "port:445 subnet:\"Office VLAN\" risk:red -os:linux process:sshd dc01".
-// Hosts match on their own attributes and their incident edges; edges match on their own
+// Hosts match on their own attributes and their incident edges (free text included); edges match on their own
 // attributes and either endpoint's host attributes. Bad input never throws; it matches nothing.
 
 const FIELDS = new Set(["ip", "host", "port", "proto", "risk", "os", "subnet", "state", "role", "tag", "collected", "seen", "process"]);
@@ -99,6 +99,12 @@ export function applyFilter(model, terms) {
     if (t.field === "process") return runs(h, t.value);
     if (t.field === null && runs(h, t.value)) return true;
     const direct = hostAttr(h, model, t.field, t.value);
+    if (t.field === null) {
+      // free text also finds a host through its connections and listening ports ("445", "smb");
+      // processes are covered by runs() above, so a peer's process does not count
+      return direct || (incident.get(h.id) ?? []).some((e) => has(e.name, t.value) || String(e.port) === t.value)
+        || h.listening.some((l) => has(l.name, t.value) || String(l.port) === t.value);
+    }
     if (direct !== undefined) return direct;
     return (incident.get(h.id) ?? []).some((e) => edgeAttr(e, t.field, t.value)) || h.listening.some((l) => listenAttr(l, t.field, t.value));
   };

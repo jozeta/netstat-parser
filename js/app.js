@@ -5,7 +5,7 @@ import { buildModel } from "./model/build.js";
 import { parseQuery, applyFilter } from "./model/filter.js";
 import { connectionsCsv, hostsCsv, targetsFile } from "./model/exports.js";
 import { createSession, parseSession } from "./model/session.js";
-import { mergeSessionSettings, validateSettings, SAVED_FILTERS_MAX, SAVED_NAME_MAX } from "./model/settings.js";
+import { mergeSessionSettings, SAVED_FILTERS_MAX, SAVED_NAME_MAX } from "./model/settings.js";
 import { findPath, neighbourhood } from "./model/paths.js";
 import { VERSION } from "./version.js";
 import { resolveButton, shouldAutoResolve, loadChoice } from "./model/policy.js";
@@ -25,13 +25,18 @@ import { renderSettings } from "./ui/settings-view.js";
 import { renderCollect } from "./ui/collect-view.js";
 import { readTheme, writeTheme, applyTheme } from "./ui/theme.js";
 import { uniqueFileNames } from "./model/files.js";
+import { chainTask, withSavedFilters } from "./model/job-guard.js";
 
 const $ = (id) => document.getElementById(id);
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
 
+const userSettings = loadSettings(storage);
 const state = {
   files: [], // ParsedFile[]
-  settings: loadSettings(storage),
+  // the user's own settings: the only copy that is stored (changed by the Settings page and saved filters)
+  userSettings,
+  // what the current job uses: userSettings, or an opened session's / restored job's tables merged in
+  settings: userSettings,
   dns: {},
   positions: {},
   collapsed: new Set(),
@@ -120,7 +125,17 @@ function scheduleSave() {
   if (!state.settings.load.keepJob) return;
   savePending = true;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { saveTimer = null; saveChain = saveChain.then(saveJobNow); }, 400);
+  saveTimer = setTimeout(() => { saveTimer = null; queueSave(); }, 400);
+}
+// a failed save (e.g. a job too large to serialise) is reported once and never blocks later saves
+function queueSave() {
+  saveChain = chainTask(saveChain, saveJobNow, () => {
+    savePending = saveTimer !== null;
+    if (!saveWarned) {
+      saveWarned = true;
+      toast("This job could not be kept in the browser (too large?), so a reload loses it. Export a session to keep it.", "warn", 10000);
+    }
+  });
 }
 async function saveJobNow() {
   // writes run one after another, so an older job can never overwrite a newer one
@@ -134,12 +149,15 @@ async function saveJobNow() {
     toast("This job could not be kept in the browser (storage full or blocked), so a reload loses it. Export a session to keep it.", "warn", 10000);
   }
 }
+// loading files or opening a session waits for this, so they never race the restore
+let restoring = Promise.resolve();
 async function restoreSavedJob() {
   if (!state.settings.load.keepJob) return;
   const gen = generation;
-  const back = fromSaved(await readJob(), state.settings);
+  const back = fromSaved(await readJob(), state.userSettings);
   if (!back || gen !== generation || state.files.length) return; // nothing kept, or the user already started
-  Object.assign(state, { ...back, known: new Set(), selected: null });
+  Object.assign(state, { ...back, known: new Set(), selected: null, pathStart: null, path: null });
+  graph.showPath(null);
   $("dns-btn").hidden = !state.settings.dns.enabled;
   rebuild({ adopt: true });
   toast(`Job restored: ${count(state.files.length, "file")}.`);
@@ -161,8 +179,11 @@ window.addEventListener("hashchange", showView);
 function applySettings(next) {
   if (next.graph.expandUpTo !== state.settings.graph.expandUpTo) state.known = new Set(); // re-apply to every group
   const forget = state.settings.load.keepJob && !next.load.keepJob;
+  // saving on the Settings page is the user's explicit choice: these become the user's own settings
   state.settings = next;
-  if (forget) { clearTimeout(saveTimer); saveTimer = null; saveChain = saveChain.then(saveJobNow); } // clears the kept job
+  state.userSettings = next;
+  if (forget) { clearTimeout(saveTimer); saveTimer = null; queueSave(); } // clears the kept job
+  renderSaved();
   if (!saveSettings(storage, next)) toast("Settings could not be stored in this browser (private mode?). They apply until you reload.", "warn");
   $("dns-btn").hidden = !next.dns.enabled;
   setDirty();
@@ -267,10 +288,16 @@ function pathProps(h) {
 function pick(id) {
   // a host inside a collapsed group: expand it first
   const h = state.model.hosts.get(id);
-  if (h && state.collapsed.has(h.groupId)) { state.collapsed.delete(h.groupId); refresh(); }
+  const expand = h && state.collapsed.has(h.groupId);
+  if (expand) state.collapsed.delete(h.groupId);
   state.selected = id;
-  graph.select(id);
-  showDetails(id);
+  // the neighbourhood view follows the selection: redraw around it (refresh selects and shows it)
+  if (state.hops) refresh({ fit: true });
+  else {
+    if (expand) refresh();
+    graph.select(id);
+    showDetails(id);
+  }
   selectTab("details");
 }
 
@@ -370,11 +397,15 @@ function parseInWorker(fileList) {
  * @param {ArrayLike<File>} fileList
  * @param {{skipped?: number, truncated?: boolean}} [found] what a folder walk left out
  */
-/** Forget the current job (files, layout, groups' state, DNS results); settings stay. */
+/**
+ * Forget the current job (files, layout, groups' state, DNS results, an opened session's tables);
+ * the user's own settings stay. Callers bump `generation` themselves.
+ */
 function resetJob() {
-  generation++;
-  dnsAbort?.abort();
-  Object.assign(state, { files: [], positions: {}, collapsed: new Set(), known: new Set(), dns: {}, selected: null, pathStart: null, path: null });
+  stopDns();
+  Object.assign(state, { files: [], positions: {}, collapsed: new Set(), known: new Set(), dns: {}, selected: null, pathStart: null, path: null,
+    settings: state.userSettings });
+  $("dns-btn").hidden = !state.settings.dns.enabled;
   graph.showPath(null);
   setDirty(false);
 }
@@ -387,6 +418,7 @@ async function loadFiles(fileList, found = {}) {
     if (found.skipped) toast(`No netstat files found (${found.skipped} other files skipped).`, "warn");
     return;
   }
+  await restoring; // a job still being restored counts as loaded (so the add/new question is asked)
   const choice = loadChoice(state.settings, state.files.length);
   let fresh = choice === "new";
   if (choice === "ask") {
@@ -395,15 +427,18 @@ async function loadFiles(fileList, found = {}) {
     if (!answer) return;
     fresh = answer === "alt";
   }
-  if (fresh) resetJob();
-  const gen = generation;
+  // a new job replaces the current one only once its files have parsed to something: a failed or
+  // empty load leaves the current job (and its kept copy) as it is. Starting a new job makes any
+  // batch still parsing for the old one stale.
+  const gen = fresh ? ++generation : generation;
   let parsed, notes;
   try { ({ parsed, notes } = await parseInWorker(fileList)); } catch (e) { toast(`Could not read the files: ${e.message}`, "bad"); return; }
   if (!parsed.length) {
-    toast(`No netstat files found${notes.problems.length ? `: ${notes.problems[0]}` : ""}.`, "warn");
+    toast(`No netstat files found${notes.problems.length ? `: ${notes.problems[0]}` : ""}.${fresh && state.files.length ? " The current job was kept." : ""}`, "warn");
     return;
   }
-  if (gen !== generation) { toast("Files parsed after a session was opened were discarded. Load them again to add them.", "warn"); return; }
+  if (gen !== generation) { toast("Files parsed for a job that has since been replaced were discarded. Load them again to add them.", "warn"); return; }
+  if (fresh) resetJob();
   uniqueFileNames(parsed.map((p) => p.fileName)).forEach((name, i) => { parsed[i].fileName = name; });
   const byName = new Map(state.files.map((f) => [f.fileName, f]));
   for (const p of parsed) byName.set(p.fileName, p); // same name → replaced
@@ -443,13 +478,17 @@ async function doExport(kind) {
 
 async function openSession(file) {
   if (!file) return;
+  await restoring;
   if (state.files.length && !(await confirmDialog("Opening a session replaces the current job. Unsaved changes are lost.", "Open session"))) return;
   try {
     const s = parseSession(await file.text());
     generation++;
+    stopDns(); // lookups for the old job must not land in the session
     // the session's tables apply to this job only: DNS opt-in and the user's internal ranges are kept, nothing is stored
-    const settings = mergeSessionSettings(state.settings, s.settings);
-    Object.assign(state, { files: s.files, settings, dns: s.dns, positions: s.positions, collapsed: new Set(s.collapsed), known: new Set(), selected: null });
+    const settings = mergeSessionSettings(state.userSettings, s.settings);
+    Object.assign(state, { files: s.files, settings, dns: s.dns, positions: s.positions, collapsed: new Set(s.collapsed), known: new Set(), selected: null,
+      pathStart: null, path: null });
+    graph.showPath(null);
     $("dns-btn").hidden = !settings.dns.enabled;
     setDirty(false);
     rebuild({ adopt: true });
@@ -463,6 +502,13 @@ async function openSession(file) {
 const dnsRanges = () => [...state.settings.internalRanges, ...state.settings.subnets.map((x) => x.cidr)];
 const resolverLabel = () => RESOLVERS[state.settings.dns.resolver]?.label ?? "the resolver";
 const resolving = new Set(); // addresses with a single lookup in flight
+/** Cancel a running "Resolve DNS" (its results are dropped once the job has been replaced). */
+function stopDns() {
+  if (!dnsAbort) return;
+  dnsAbort.abort();
+  dnsAbort = null;
+  $("dns-label").textContent = "Resolve DNS";
+}
 
 /** Look up every unresolved Internet host. auto: started by loading files (no questions asked). */
 async function runDns({ auto = false } = {}) {
@@ -471,27 +517,31 @@ async function runDns({ auto = false } = {}) {
   if (!enabled || !resolver) { toast("Enable DNS lookup in Settings first.", "warn"); return; }
   const ips = [...state.model.hosts.values()].filter((h) => !h.internal).map((h) => h.ips[0]).filter((ip) => ip && !(ip in state.dns));
   if (!ips.length) { if (!auto) toast("No unresolved Internet hosts."); return; }
+  const dns = state.dns; // this job's results: answers arriving after the job was replaced are dropped
   if (!acknowledged && !(await confirmDialog(`Up to ${ips.length} public IP address${ips.length > 1 ? "es" : ""} will be sent to ${resolverLabel()} to look up their names. Internal addresses are never sent. (Tick the acknowledgement in Settings to stop this question.)`, "Send to resolver"))) return;
-  dnsAbort = new AbortController();
+  if (dnsAbort || state.dns !== dns) return; // another lookup started, or the job changed, during the question
+  const ctl = dnsAbort = new AbortController();
   $("dns-label").textContent = "Cancel DNS";
   $("progress").hidden = false;
   const partial = new Map();
+  const current = () => state.dns === dns;
   try {
-    const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: dnsAbort.signal, internalRanges: dnsRanges(),
+    const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: ctl.signal, internalRanges: dnsRanges(),
       onResult: (ip, name) => partial.set(ip, name),
       onProgress: (d, t) => { $("progress-text").textContent = `${resolverLabel()} DNS ${d} / ${t}…`; } });
     const named = [...res.values()].filter(Boolean).length;
     const notSent = ips.length - res.size;
-    toast(`DNS: ${named} of ${res.size} addresses have a name (via ${resolverLabel()}).${notSent ? ` ${notSent} not sent (documentation, reserved or internal ranges never have public names).` : ""}`);
+    if (current()) toast(`DNS: ${named} of ${res.size} addresses have a name (via ${resolverLabel()}).${notSent ? ` ${notSent} not sent (documentation, reserved or internal ranges never have public names).` : ""}`);
   } catch (e) {
-    toast(e.name === "AbortError" ? `DNS lookup cancelled; ${partial.size} addresses kept.` : `DNS lookup failed: ${e.message}`, "warn");
+    if (current()) toast(e.name === "AbortError" ? `DNS lookup cancelled; ${partial.size} addresses kept.` : `DNS lookup failed: ${e.message}`, "warn");
   } finally {
-    for (const [ip, name] of partial) state.dns[ip] = name;
-    dnsAbort = null;
-    $("dns-label").textContent = "Resolve DNS";
+    if (dnsAbort === ctl) { dnsAbort = null; $("dns-label").textContent = "Resolve DNS"; }
     $("progress").hidden = true;
-    setDirty();
-    refresh();
+    if (current()) {
+      for (const [ip, name] of partial) dns[ip] = name;
+      setDirty();
+      refresh();
+    }
   }
 }
 
@@ -501,17 +551,19 @@ async function resolveOne(host) {
   const { disabled, warn } = resolveButton(state.settings);
   if (disabled || !ip || resolving.has(ip)) return;
   if (warn && !(await confirmDialog(`${ip} will be sent to ${resolverLabel()} to look up its name. (Tick the acknowledgement in Settings to stop this question.)`, "Send to resolver"))) return;
+  const dns = state.dns; // answers arriving after the job was replaced are dropped
   resolving.add(ip);
   showDetails(state.selected);
   try {
     const res = await resolvePtrs([ip], { resolver: state.settings.dns.resolver, fetch: (u, o) => window.fetch(u, o), internalRanges: dnsRanges(), delayMs: 0 });
+    if (state.dns !== dns) return;
     if (!res.has(ip)) { toast(`${ip} was not sent: it is in a range that never has a public name (documentation, reserved or internal).`, "warn"); return; }
-    state.dns[ip] = res.get(ip);
+    dns[ip] = res.get(ip);
     toast(res.get(ip) ? `${ip} is ${res.get(ip)}.` : `${ip} has no DNS name (no PTR record).`);
     setDirty();
     refresh();
   } catch (e) {
-    toast(`DNS lookup failed: ${e.message}`, "warn");
+    if (state.dns === dns) toast(`DNS lookup failed: ${e.message}`, "warn");
   } finally {
     resolving.delete(ip);
     if (state.selected) showDetails(state.selected);
@@ -635,7 +687,7 @@ function init() {
   state.model = buildModel([], state.settings);
   rebuild();
   showView();
-  restoreSavedJob();
+  restoring = restoreSavedJob().catch(() => {}); // never rejects: a broken kept job is simply not restored
 }
 
 function initTheme() {
@@ -681,8 +733,11 @@ function renderSaved() {
       onclick: () => storeSaved(state.settings.savedFilters.filter((g) => g !== f)) }, "×"))));
 }
 function storeSaved(list) {
-  state.settings = validateSettings({ ...state.settings, savedFilters: list });
-  if (!saveSettings(storage, state.settings)) toast("Saved filters could not be stored in this browser (private mode?). They apply until you reload.", "warn");
+  // only the user's own settings are stored, never an opened session's tables
+  const { user, effective } = withSavedFilters(state.userSettings, state.settings, list);
+  state.userSettings = user;
+  state.settings = effective;
+  if (!saveSettings(storage, user)) toast("Saved filters could not be stored in this browser (private mode?). They apply until you reload.", "warn");
   renderSaved();
 }
 async function saveFilter() {

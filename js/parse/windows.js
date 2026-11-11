@@ -2,9 +2,12 @@
 //   TCP    10.10.10.21:49712      10.10.1.10:445         ESTABLISHED     4
 //   UDP    0.0.0.0:123            *:*                                    1456
 // -anob adds "[process.exe]", service-name and "Can not obtain ownership" lines after a socket line.
+// -anot adds an Offload State column (InHost / Offloaded / ...), which is ignored.
 
 import { splitEndpoint } from "../lib/ip.js";
 import { splitLines, isCandidate, createResult, makeRecord, addProcess } from "./common.js";
+
+const OFFLOAD = /^(InHost|Offloaded|Offloading|Uploading)$/i;
 
 /**
  * @param {string} body
@@ -15,6 +18,7 @@ export function parseWindows(body) {
   let last = null;
   splitLines(body).forEach((line, idx) => {
     const tokens = line.trim().split(/\s+/);
+    if (tokens.length > 3 && OFFLOAD.test(tokens[tokens.length - 1])) tokens.pop();
     if (!isCandidate(tokens)) {
       const exe = /^\[(.+)\]$/.exec(line.trim());
       if (exe && last && !last.process) addProcess(last, null, exe[1]);

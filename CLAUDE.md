@@ -87,8 +87,10 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 - The edge port is the **service port**: the listening port if known, else the lower or
   well-known one. Never use the local port blindly; that was the old tool's bug.
 - Job data lives in memory, in exported session files, and (setting `load.keepJob`, default on)
-  in one IndexedDB record so a reload keeps it (`js/model/saved-job.js` + `js/ui/job-db.js`; read
-  back as untrusted, like a session). `localStorage` holds **settings only**.
+  in one IndexedDB record per tab so a reload keeps it (`js/model/saved-job.js` + `js/ui/job-db.js`
+  + `js/model/job-guard.js`; read back as untrusted, like a session; Web Locks let a new tab take
+  over a closed tab's job but never an open one's). `localStorage` holds **settings only**, and only
+  the user's own (`state.userSettings`), never a session's.
 - The layout must not depend on labels (DNS names would move nodes): sort by stable keys.
 - The CSP stays strict. The only allowed exception is `connect-src` for the fixed DNS-over-HTTPS
   resolvers (Cloudflare, Google, Quad9), used for the opt-in DNS lookup. That waiver must be
@@ -119,4 +121,6 @@ colours are theme tokens: "safe" is neutral light grey, not black.
   `vendor/`).
 - Keep CI (`.github/workflows/ci.yml`) green; record user-visible changes under "Unreleased" in
   `CHANGELOG.md`.
-- There is no GitHub remote yet. Don't push or create repos unless asked.
+- Public repo: https://github.com/jozeta/netstat-parser (GitHub Pages: https://jozeta.github.io/netstat-parser/).
+  Don't push unless asked; every push that changes the app bumps the version (package.json,
+  `js/version.js`, `collector/npcollect/__init__.py`, README, CHANGELOG; `tests/version.test.mjs` checks).

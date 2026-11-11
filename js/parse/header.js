@@ -59,12 +59,13 @@ export function parseHeader(text) {
 }
 
 /**
- * "DC01_netstat.txt" → "DC01"; otherwise the base name without extension.
+ * "DC01_netstat.txt" → "DC01"; otherwise the base name without a .txt/.log/.out extension.
+ * Other dots are kept: "10.0.0.5" and "web01.corp.local" are host names, not extensions.
  * @param {string} name
  */
 export function hostnameFromFileName(name) {
   const base = String(name).split(/[\\/]/).pop() ?? "";
-  const m = /^(.+?)_netstat\.txt$/i.exec(base);
-  const raw = m ? m[1] : base.replace(/\.[^.]*$/, "");
+  const noExt = base.replace(/\.(txt|log|out)$/i, "") || base;
+  const raw = noExt.replace(/_netstat$/i, "") || noExt;
   return cleanText(raw, 253) || "unknown";
 }

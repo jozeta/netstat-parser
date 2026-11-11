@@ -114,7 +114,7 @@ def main(argv=None, *, env=os.environ, prompt=getpass.getpass, out=sys.stdout, e
         claimed = host_from_header(data)
         if claimed is None:
             raise remote.CollectError("no netstat-parser header in the output (is the remote shell POSIX sh / PowerShell?)")
-        base = safe_name(claimed) or safe_name(t.host) or f"target-line-{t.line}"
+        base = (safe_name(claimed) if claimed else None) or safe_name(t.host) or f"target-line-{t.line}"
         return write_output(folder, base, data)
 
     ok = failed = 0

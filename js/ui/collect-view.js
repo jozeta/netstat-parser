@@ -27,7 +27,7 @@ $ips = (Get-NetIPAddress | Where-Object { $_.IPAddress -notmatch '^(127\\.|::1$)
 {
   echo "### netstat-parser v1"
   echo "hostname: $h"
-  echo "os: $( . /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr)"
+  echo "os: $( [ -r /etc/os-release ] && . /etc/os-release && echo "$PRETTY_NAME" || uname -sr)"
   echo "collected: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "addresses: $(ip -o addr show 2>/dev/null | awk '$4 !~ /^(127\\.|::1)/ {print $4}' | paste -sd, - | sed 's/,/, /g')"
   echo "### netstat"

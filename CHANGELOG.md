@@ -4,8 +4,43 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+## 0.2.1 (2026-11-11)
+
+Bug fixes from a full code review (32 issues).
+
 - The app is published on GitHub Pages: <https://jozeta.github.io/netstat-parser/> (link in the
   README). It is the same static app; files are still only read in your browser.
+- Privacy: DNS lookup sends IPv6 addresses only from global unicast (2000::/3), so private
+  addresses in IPv6 form (`::10.0.0.5`, `::ffff:0:a00:5`), site-local `fec0::/10` and `100::/64`
+  are never sent; 192.0.0.0/24 and 192.88.99.0/24 are blocked too. Opening a session keeps your own
+  named subnets protected. DNS answers that arrive after "Start new job" or "Open session" are
+  dropped, and opening a session cancels a running lookup.
+- Settings: a session's or restored job's subnet names and protocol table are no longer saved as
+  your own settings (only the Settings page and saved filters change what is stored). Importing a
+  settings file without saved filters keeps yours, and the chips update after any settings change.
+- Kept job: a "Start new job" load that reads nothing keeps the current job (it used to empty it
+  and delete the kept copy). Each tab keeps its own job, so two tabs never overwrite each other;
+  a closed tab's job is taken over by the next tab. One failed save no longer stops later saves.
+  Files dropped while the kept job is being restored are no longer merged into it unasked.
+- Parsing: `ss -tanp`, `-tlnp`, `-uanp` (no Netid column), Linux `netstat -tunae`/`-tunaep` (User
+  and Inode columns), Windows `netstat -anot` (Offload State column), macOS `-anv` process names
+  with spaces, and macOS IPv6 addresses cut to 16 characters are flagged. Host names from file
+  names keep their dots (`10.0.0.5`, `web01.corp.local`), and such files are read from folders and
+  zips. Zip entry names from Windows' "Send to compressed folder" (CP437) are decoded correctly.
+- Model: two machines with the same short name in different domains stay two hosts; a Docker
+  bridge address no longer decides a host's subnet, and container addresses are per host (and
+  left out of the collector targets export); a connection to a host's own link-local address no
+  longer makes an empty node; a session cannot give an IPv4 address a prefix above 32.
+- Search: plain words (`445`, `smb`) also match the hosts on those connections, so "Hide
+  non-matching" shows them.
+- Robustness: zips whose entries share data (zip bombs) stop at the size limit; files full of blank
+  lines or very long lines no longer stall parsing; one unreadable item no longer fails a whole
+  folder drop. Picking a host from a list redraws the neighbourhood view; opening a session clears
+  a shown path.
+- Collector: noisy ssh error output no longer stalls collection; `port=` takes ASCII digits only;
+  the Linux script falls back to `uname -sr` when `/etc/os-release` is missing; output whose header
+  has an empty hostname is kept; `[::1]:22` style hosts are rejected (use `port=`), and zone ids are
+  rejected for WinRM.
 
 ## 0.2.0 (2026-11-11)
 

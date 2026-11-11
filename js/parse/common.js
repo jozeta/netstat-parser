@@ -4,6 +4,11 @@ import { normalizeState } from "./states.js";
 import { cleanText } from "./header.js";
 
 const CANDIDATE = /^(tcp|udp)(4|6|46)?$/i;
+// ss state names (iproute2 sstate_name). `ss -tanp` / `-uanp` (one protocol) print no Netid
+// column, so their lines start with one of these.
+export const SS_STATE = /^(ESTAB|LISTEN|UNCONN|SYN-SENT|SYN-RECV|NEW-SYN-RECV|FIN-WAIT-1|FIN-WAIT-2|TIME-WAIT|CLOSE-WAIT|LAST-ACK|CLOSING|CLOSED|UNKNOWN|BOUND-INACTIVE)$/;
+/** Longer lines are never netstat socket lines; skipping them keeps per-line regexes linear. */
+export const MAX_LINE = 1000;
 const MAX_LINE_SAMPLE = 300;
 const MAX_SAMPLES = 50;
 

@@ -84,8 +84,10 @@ One parser per format behind an auto-detector, all producing the same record:
 `{ proto (tcp|udp), localIp, localPort, remoteIp, remotePort, state, pid?, process?, family (4|6) }`.
 
 Must support:
-- Windows `netstat -ano` (and `-an`, `-anob` tolerated).
-- Linux `netstat -tunap` / `-tuna` and `ss -tunap` / `-tuna`.
+- Windows `netstat -ano` (and `-an`, `-anob`, `-anot` with its Offload State column tolerated).
+- Linux `netstat -tunap` / `-tuna` (also `-tunae`/`-tunaep` with User and Inode columns) and
+  `ss -tunap` / `-tuna`, plus single-protocol `ss -tanp` / `-tlnp` / `-uanp` without the Netid
+  column (UDP when the file has UNCONN lines and no TCP-only states, else TCP).
 - macOS `netstat -anv -p tcp` / `netstat -an` (dotted `ip.port` notation, `tcp4/tcp6/udp4/udp6`).
 - IPv4 and IPv6 (bracketed and unbracketed forms, zone IDs stripped), `*`/`0.0.0.0`/`::` as
   wildcard.
@@ -263,9 +265,13 @@ Stored in `localStorage` (settings only; the job itself is kept separately, see 
     the toolbar run. Disabled (with a hint) while DNS lookup is not enabled.
   - **Automatically after loading files** (Settings checkbox; only available once lookup is enabled
     and the acknowledgement is ticked).
-- Never sent: internal ranges (default, Settings, named subnets), multicast/reserved, IPv6 forms
-  embedding IPv4 (NAT64, 6to4, Teredo), and documentation/benchmark ranges (192.0.2/24,
-  198.51.100/24, 203.0.113/24, 198.18/15, 2001:db8::/32), which never have public names. The
+- Never sent: internal ranges (default, Settings, named subnets — also after a session is
+  opened), multicast/reserved (incl. 192.0.0/24, 192.88.99/24), any IPv6 address outside global
+  unicast 2000::/3 (so IPv4-compatible `::a.b.c.d`, IPv4-translated, site-local fec0::/10 and
+  discard 100::/64 are never sent), IPv6 forms embedding IPv4 (NAT64, 6to4, Teredo), and
+  documentation/benchmark ranges (192.0.2/24, 198.51.100/24, 203.0.113/24, 198.18/15,
+  2001:db8::/32), which never have public names. Answers that arrive after the job was replaced
+  are dropped. The
   summary says how many were not sent.
 - Results are stored in the session file and shown as node labels, in the panel and in search.
 - CSP `connect-src` lists exactly those resolver origins; `.claude-standards` records the waiver
@@ -274,10 +280,16 @@ Stored in `localStorage` (settings only; the job itself is kept separately, see 
 ### Data handling and exports
 
 - **The current job is kept in this browser** (owner decision 2026-11-11), so a reload or a closed
-  tab does not lose it: one IndexedDB record, saved shortly after every change, in the session
-  format, read back through the same validation as an imported session. It stays on this computer
+  tab does not lose it: one IndexedDB record per browser tab, saved shortly after every change, in
+  the session format, read back through the same validation as an imported session. Each tab
+  holds a Web Lock while open; a tab without its own record takes over the newest record of a
+  closed tab (free lock), never one of an open tab, so two tabs with two clients' jobs never swap.
+  Records not saved for 30 days are deleted. A "Start new job" load that reads nothing keeps the
+  current job. It stays on this computer
   until a new job is started or the setting "Keep the current job in this browser" is turned off
-  (which deletes it). `localStorage` still holds settings only. The unsaved-work warning only
+  (which deletes it). `localStorage` still holds settings only, and only the user's own: a
+  session's or restored job's subnet names and protocol table apply to that job but are never
+  stored (the Settings page and saved filters are the only things that change what is stored). The unsaved-work warning only
   appears when the job is not kept (setting off, storage blocked or full, or a save still pending).
 - Layout never depends on labels: hosts in a group are ordered by role, number of connections,
   then address. A DNS answer changes a label but never moves a node.

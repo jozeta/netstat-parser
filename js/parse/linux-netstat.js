@@ -1,8 +1,9 @@
-// Linux `netstat -tunap` / `-tuna` (net-tools).
+// Linux `netstat -tunap` / `-tuna` / `-tunaep` (net-tools; -e adds User and Inode columns).
 //   tcp        0      0 10.10.20.5:22           10.10.1.30:51544        ESTABLISHED 1201/sshd: root@pts/0
 //   udp        0      0 0.0.0.0:68              0.0.0.0:*                           600/dhclient
 
 import { splitEndpoint } from "../lib/ip.js";
+import { normalizeState } from "./states.js";
 import { splitLines, isCandidate, createResult, makeRecord, addProcess } from "./common.js";
 
 const PID_PROG = /^(\d+)\/(.*)$/;
@@ -30,11 +31,18 @@ export function parseLinuxNetstat(body) {
     if (!local || !remote) { res.addUnparsed(idx + 1, line); return; }
     let rest = tokens.slice(5);
     let stateWord = null;
-    if (rest.length && rest[0] !== "-" && !PID_PROG.test(rest[0])) { stateWord = rest[0]; rest = rest.slice(1); }
+    const isTcp = tokens[0].toLowerCase().startsWith("tcp");
+    // TCP always has a state column; UDP only when the word is a known state (else it is the
+    // -e User column, or PID/Program)
+    if (rest.length && rest[0] !== "-" && !PID_PROG.test(rest[0]) && (isTcp || normalizeState(rest[0]))) {
+      stateWord = rest[0]; rest = rest.slice(1);
+    }
     const rec = makeRecord(tokens[0], local, remote, stateWord, res.unknown);
     if (!rec) { res.addUnparsed(idx + 1, line); return; }
     if (mayBeTruncated(tokens[3]) || mayBeTruncated(tokens[4])) truncated++;
-    const m = PID_PROG.exec(rest.join(" "));
+    // with -e, User and Inode come before PID/Program; the program name may contain spaces
+    const at = rest.findIndex((t) => /^\d+\/./.test(t));
+    const m = at < 0 ? null : PID_PROG.exec(rest.slice(at).join(" "));
     if (m) addProcess(rec, m[1], m[2]);
     res.records.push(rec);
   });

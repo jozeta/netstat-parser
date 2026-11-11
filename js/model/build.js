@@ -6,9 +6,12 @@ import { isLoopback, normalizeIp } from "../lib/ip.js";
 import { classify } from "./settings.js";
 
 const LINK_LOCAL = ["169.254.0.0/16", "fe80::/10"].map(parseCidr);
+// Docker's default bridge: every Docker host has 172.17.0.1 and its own 172.17.0.x containers
+const DOCKER_BRIDGE = parseCidr("172.17.0.0/16");
 
 const shortName = (name) => (normalizeIp(name) ? name : name.split(".")[0]).toLowerCase();
 const isLinkLocal = (ip) => LINK_LOCAL.some((c) => inCidr(ip, c));
+const isDockerBridge = (ip) => inCidr(ip, DOCKER_BRIDGE);
 const usable = (ip) => ip && ip !== "*" && !isLoopback(ip);
 
 /** "Microsoft Windows Server 2022" → windows; falls back to the netstat format. */
@@ -51,10 +54,25 @@ export function buildModel(files, settings) {
   const fileHost = new Map(); // ParsedFile → host id
 
   // ---- collected hosts ----
-  for (const f of files) {
-    if (f.warnings?.notRecognised && f.records.length === 0) continue;
-    // "dc01.corp.local" (header) and "DC01" (file name) are one machine: key on the short name
-    const id = `h:${shortName(f.hostname)}`;
+  const counted = files.filter((f) => !(f.warnings?.notRecognised && f.records.length === 0));
+  // "dc01.corp.local" (header) and "DC01" (file name) are one machine: key on the short name, unless
+  // two different FQDNs share it (web01.prod.corp, web01.dev.corp): then each FQDN is its own host
+  const fqdns = new Map(); // short name → Set of lower-cased FQDNs
+  for (const f of counted) {
+    if (normalizeIp(f.hostname) || !f.hostname.includes(".")) continue;
+    const short = shortName(f.hostname);
+    if (!fqdns.has(short)) fqdns.set(short, new Set());
+    fqdns.get(short).add(f.hostname.toLowerCase());
+  }
+  const hostKey = (name) => {
+    const short = shortName(name);
+    const qualified = !normalizeIp(name) && name.includes(".");
+    return qualified && (fqdns.get(short)?.size ?? 0) > 1 ? name.toLowerCase() : short;
+  };
+  const useCount = new Map(); // host id → Map(local ip → records using it)
+  const headerIps = new Map(); // host id → header addresses
+  for (const f of counted) {
+    const id = `h:${hostKey(f.hostname)}`;
     let h = hosts.get(id);
     if (!h) { h = newHost(id, { hostname: f.hostname, collected: true, internal: true }); hosts.set(id, h); }
     else if (f.hostname.includes(".") && !h.hostname.includes(".") && !normalizeIp(f.hostname)) { h.hostname = f.hostname; h.label = f.hostname; }
@@ -63,8 +81,16 @@ export function buildModel(files, settings) {
     if (!h.osDetail && f.header?.os) h.osDetail = f.header.os;
     if (h.os === "unknown" || f.header?.os) h.os = osFrom(h.osDetail, f.format);
     const own = [];
-    for (const a of f.header?.addresses ?? []) { own.push(a.ip); if (a.prefix !== null) prefixHint.set(a.ip, a.prefix); }
-    for (const r of f.records) if (usable(r.localIp)) own.push(r.localIp);
+    const uses = useCount.get(id) ?? new Map();
+    useCount.set(id, uses);
+    const hdr = headerIps.get(id) ?? [];
+    headerIps.set(id, hdr);
+    for (const a of f.header?.addresses ?? []) { own.push(a.ip); hdr.push(a.ip); if (a.prefix !== null) prefixHint.set(a.ip, a.prefix); }
+    for (const r of f.records) {
+      if (!usable(r.localIp)) continue;
+      own.push(r.localIp);
+      uses.set(r.localIp, (uses.get(r.localIp) ?? 0) + 1);
+    }
     for (const ip of own) {
       if (!h.ips.includes(ip)) h.ips.push(ip);
       if (isLinkLocal(ip)) continue;
@@ -79,27 +105,46 @@ export function buildModel(files, settings) {
   }
   for (const h of hosts.values()) h.internal = h.ips.length === 0 || h.ips.some(isInternal);
 
+  // primary address (group, first in ips): a header address if any, else the most-used local address;
+  // never a Docker bridge address or one that several hosts claim, unless nothing else is left
+  const primaryOf = new Map();
+  for (const h of hosts.values()) {
+    const fit = (ip) => !isLinkLocal(ip) && !isDockerBridge(ip) && !conflicts.has(ip);
+    const uses = useCount.get(h.id), hdr = headerIps.get(h.id) ?? [];
+    const rank = (ip) => [ip.includes(":") ? 1 : 0, hdr.includes(ip) ? 0 : 1, -(uses?.get(ip) ?? 0), h.ips.indexOf(ip)];
+    const cmp = (a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; };
+    const best = h.ips.filter(fit).sort(cmp)[0];
+    if (!best) continue;
+    primaryOf.set(h.id, best);
+    h.ips = [best, ...h.ips.filter((ip) => ip !== best)];
+  }
   // ---- seen-only hosts and loopback ----
-  const hostForIp = (ip) => {
+  const hostForIp = (ip, observer) => {
     const owner = ipOwner.get(ip);
     if (owner) return owner;
-    const id = `ip:${ip}`;
-    if (!hosts.has(id)) hosts.set(id, newHost(id, { ip, collected: false, internal: isInternal(ip) }));
+    const id = remoteId(ip, observer);
+    if (!hosts.has(id)) {
+      const h = newHost(id, { ip, collected: false, internal: isInternal(ip) });
+      if (id !== `ip:${ip}`) h.localTo = observer; // a container on that host's bridge, not a shared node
+      hosts.set(id, h);
+    }
     return id;
   };
   for (const f of files) {
     const hid = fileHost.get(f);
     if (!hid) continue;
+    const self = hosts.get(hid);
     for (const r of f.records) {
-      if (isLoopback(r.localIp) || isLoopback(r.remoteIp)) { hosts.get(hid).loopback.push(r); continue; }
-      if (usable(r.remoteIp)) hostForIp(r.remoteIp);
+      if (isLoopback(r.localIp) || isLoopback(r.remoteIp)) { self.loopback.push(r); continue; }
+      // its own address (e.g. fe80::1, which ipOwner skips) is not another host
+      if (usable(r.remoteIp) && !self.ips.includes(r.remoteIp)) hostForIp(r.remoteIp, hid);
     }
   }
 
   // ---- groups ----
   const groups = new Map();
   const groupFor = (h) => {
-    const primary = h.ips.find((ip) => !isLinkLocal(ip) && !ip.includes(":")) ?? h.ips.find((ip) => !isLinkLocal(ip)) ?? h.ips[0];
+    const primary = primaryOf.get(h.id) ?? h.ips.find((ip) => !isLinkLocal(ip) && !ip.includes(":")) ?? h.ips.find((ip) => !isLinkLocal(ip)) ?? h.ips[0];
     if (!primary) return { id: "g:none", kind: "subnet", cidr: null, name: "No address" };
     if (!isInternal(primary)) return { id: "g:internet", kind: "internet", cidr: null, name: "Internet" };
     const hit = named.find((s) => inCidr(primary, s.cidr));
@@ -129,6 +174,11 @@ export function buildModel(files, settings) {
 }
 
 const LISTENING = new Set(["LISTEN", "BOUND"]);
+
+/** Node id of an address no collected host owns; Docker bridge addresses are per observing host. */
+function remoteId(ip, observer) {
+  return isDockerBridge(ip) ? `ip:${ip}@${observer}` : `ip:${ip}`;
+}
 
 function buildEdges(files, fileHost, hosts, ipOwner, settings) {
   // listening sockets per collected host
@@ -160,7 +210,7 @@ function buildEdges(files, fileHost, hosts, ipOwner, settings) {
     for (const r of f.records) {
       if (LISTENING.has(r.state) || !usable(r.remoteIp) || isLoopback(r.localIp)) continue;
       if (r.localPort === null || r.remotePort === null) continue;
-      const rid = ipOwner.get(r.remoteIp) ?? `ip:${r.remoteIp}`;
+      const rid = ipOwner.get(r.remoteIp) ?? remoteId(r.remoteIp, hid);
       // own address (e.g. a Docker bridge IP that another host also has) → not an edge
       if (rid === hid || hosts.get(hid).ips.includes(r.remoteIp)) continue;
       const localServes = listensOn(hid, r.proto, r.localPort);

@@ -9,7 +9,8 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def host_from_header(data: bytes) -> Optional[str]:
-    """The ``hostname:`` value of a netstat-parser header, or None if there is no header."""
+    """The ``hostname:`` value of a netstat-parser header, "" if the header has no (or an empty)
+    hostname, or None if there is no header."""
     lines = data[:8192].decode("utf-8", errors="replace").lstrip("﻿").splitlines()
     if not lines or lines[0].strip() != "### netstat-parser v1":
         return None
@@ -19,7 +20,7 @@ def host_from_header(data: bytes) -> Optional[str]:
         name, sep, value = line.partition(":")
         if sep and name.strip().lower() == "hostname" and value.strip():
             return value.strip()
-    return None
+    return ""
 
 
 def safe_name(name: str) -> Optional[str]:

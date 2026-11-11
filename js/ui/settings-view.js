@@ -2,6 +2,7 @@
 import { el, replace, download } from "./dom.js";
 import { validateSettings, DEFAULT_SETTINGS, RISKS } from "../model/settings.js";
 import { RESOLVERS } from "../model/dns.js";
+import { importedSettings } from "../model/job-guard.js";
 
 const RISK_LABEL = { vulnerable: "Vulnerable (red)", exploitable: "Exploitable / unencrypted (orange)", safe: "Safe", unclassified: "Unclassified" };
 
@@ -120,7 +121,8 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
     const f = importInput.files[0];
     if (!f) return;
     try {
-      const s = validateSettings(JSON.parse(await f.text()));
+      // a file without saved filters keeps the current ones
+      const s = importedSettings(JSON.parse(await f.text()), current());
       onSave(s);
       renderSettings(root, s, { onSave, toast, current });
       toast("Settings imported.");

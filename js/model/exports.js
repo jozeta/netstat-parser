@@ -64,6 +64,7 @@ export function targetsFile(model) {
   const lines = [];
   for (const h of model.hosts.values()) {
     if (h.collected || !h.internal || !h.ips.length) continue;
+    if (h.localTo) continue; // a container behind one host's Docker bridge: not reachable as a target
     if (LINK_LOCAL.some((c) => inCidr(h.ips[0], c))) continue; // unusable without a scope id
     const p = served.get(h.id) ?? new Set();
     const ip = h.ips[0];

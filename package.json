@@ -1,6 +1,6 @@
 {
   "name": "netstat-parser",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "webapp that parses multiple netstat files from computers and builds a graph",
   "type": "module",

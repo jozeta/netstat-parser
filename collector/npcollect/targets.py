@@ -15,7 +15,9 @@ KEYS = ("user", "port", "key", "password-env", "domain")
 # Only NP_* variables: a targets file (untrusted) must not be able to send an arbitrary secret from
 # the operator's environment, such as AWS_SECRET_ACCESS_KEY, as the password to a host it names.
 _ENV_NAME = re.compile(r"^NP_[A-Za-z0-9_]+$")
-_HOST = re.compile(r"^[A-Za-z0-9._:%\[\]-]+$")
+_NAME = re.compile(r"[A-Za-z0-9._-]+")  # host name or IPv4 address
+_IPV6 = re.compile(r"[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*(%[A-Za-z0-9._-]+)?")  # optional %zone (link-local)
+_PORT = re.compile(r"[0-9]{1,5}")
 
 
 @dataclass(frozen=True)
@@ -42,10 +44,33 @@ def _strip_comment(raw: str) -> str:
     return re.split(r"\s#", raw, maxsplit=1)[0]
 
 
+def _check_host(host: str, method: str) -> Optional[str]:
+    """None if the host is usable, else the error. Brackets are allowed only around a whole IPv6
+    address (``[fe80::1]``); a port belongs in port=, not in the host."""
+    invalid = f"'{host}' is not a valid host name or address"
+    if host.startswith("-"):
+        return invalid
+    bracketed = re.fullmatch(r"\[([^\[\]]*)\](.*)", host)
+    if bracketed:
+        addr, rest = bracketed.groups()
+        if rest:
+            return (f"'{host}': put the port in port=, not in the host" if re.fullmatch(r":[0-9]+", rest)
+                    else invalid)
+        if not _IPV6.fullmatch(addr):
+            return invalid
+    elif "[" in host or "]" in host:
+        return invalid
+    elif host.count(":") == 1:
+        return f"'{host}': put the port in port=, not in the host"
+    elif not (_NAME.fullmatch(host) or _IPV6.fullmatch(host)):
+        return invalid
+    if "%" in host and method == "winrm":
+        return f"'{host}': winrm does not support IPv6 zone ids (%...); use a global address or the host name"
+    return None
+
+
 def _parse_line(fields: List[str], line: int) -> Tuple[Optional[Target], Optional[str]]:
     host = fields[0]
-    if host.startswith("-") or not _HOST.match(host):
-        return None, f"'{host}' is not a valid host name or address"
     if len(fields) < 2:
         return None, "missing method (ssh or winrm)"
     method = fields[1].lower()
@@ -53,6 +78,9 @@ def _parse_line(fields: List[str], line: int) -> Tuple[Optional[Target], Optiona
         return None, "SMB is not supported; use winrm (WinRM must be enabled on the target)"
     if method not in METHODS:
         return None, f"unknown method '{fields[1]}' (use ssh or winrm)"
+    host_error = _check_host(host, method)
+    if host_error:
+        return None, host_error
     values = {}
     for field in fields[2:]:
         name, sep, value = field.partition("=")
@@ -70,7 +98,8 @@ def _parse_line(fields: List[str], line: int) -> Tuple[Optional[Target], Optiona
         values[name] = value
     port = None
     if "port" in values:
-        if not values["port"].isdigit() or not 1 <= int(values["port"]) <= 65535:
+        # ASCII digits only: str.isdigit() also accepts '²' and '٣', which int() rejects or misreads
+        if not _PORT.fullmatch(values["port"]) or not 1 <= int(values["port"]) <= 65535:
             return None, f"port '{values['port']}' is not 1-65535"
         port = int(values["port"])
     env = values.get("password-env")

@@ -11,7 +11,8 @@ class Output(unittest.TestCase):
         data = b"### netstat-parser v1\r\nhostname: dc01.corp.local\r\nos: x\r\n### netstat\r\nhostname: later\r\n"
         self.assertEqual(host_from_header(data), "dc01.corp.local")
         self.assertIsNone(host_from_header(b"Active Connections\r\n  Proto ...\r\nhostname: nope\r\n"))
-        self.assertIsNone(host_from_header(b"### netstat-parser v1\nos: x\n### netstat\n"))
+        # a header without a hostname is still a header: "" (the caller falls back to the target name)
+        self.assertEqual(host_from_header(b"### netstat-parser v1\nos: x\n### netstat\n"), "")
 
     def test_safe_name(self):
         self.assertEqual(safe_name("dc01.corp.local"), "dc01.corp.local")

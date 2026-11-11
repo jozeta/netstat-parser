@@ -5,11 +5,28 @@
 export const ZIP_LIMITS = Object.freeze({ maxEntry: 50 * 1024 * 1024, maxTotal: 500 * 1024 * 1024, maxEntries: 10_000 });
 
 const size = (n) => (n >= 1024 * 1024 ? `${Math.round(n / (1024 * 1024))} MB` : `${n} bytes`);
-const names = new TextDecoder("utf-8");
+const utf8 = new TextDecoder("utf-8");
+const utf8Strict = new TextDecoder("utf-8", { fatal: true });
+// IBM code page 437, bytes 0x80-0xff: the OEM code page Windows' "Send to > Compressed folder" uses
+const CP437_HIGH = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐" +
+  "└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u00a0";
+
+/** Entry name: UTF-8 when general-purpose flag bit 11 says so or the bytes are valid UTF-8, else CP437. */
+function decodeName(raw, flags) {
+  if (flags & 0x800) return utf8.decode(raw);
+  try {
+    return utf8Strict.decode(raw);
+  } catch {
+    let out = "";
+    for (const b of raw) out += b < 0x80 ? String.fromCharCode(b) : CP437_HIGH[b - 0x80];
+    return out;
+  }
+}
 
 /**
  * Inflate raw deflate data, giving up once the output passes cap bytes.
- * @returns {Promise<{data?: Uint8Array, over?: boolean, broken?: boolean}>}
+ * @returns {Promise<{data?: Uint8Array, over?: boolean, inflated?: number, broken?: boolean}>}
+ *   inflated: bytes produced before giving up
  */
 async function inflate(body, cap) {
   const ds = new globalThis.DecompressionStream("deflate-raw");
@@ -24,7 +41,7 @@ async function inflate(body, cap) {
       const { done, value } = await reader.read();
       if (done) break;
       n += value.length;
-      if (n > cap) { reader.cancel().catch(() => {}); return { over: true }; }
+      if (n > cap) { reader.cancel().catch(() => {}); return { over: true, inflated: n }; }
       chunks.push(value);
     }
   } catch {
@@ -60,19 +77,25 @@ export async function unzip(bytes, limits = {}) {
   if (count > L.maxEntries) return fail(`more than ${L.maxEntries} entries; not unpacked`);
   if (cdOff + cdSize > len) return fail("damaged archive (central directory out of range)");
 
+  // total counts every byte unpacked, including entries dropped as too large, so the work done
+  // on one archive is bounded by maxTotal
   let p = cdOff, total = 0;
+  const usedOffsets = new Set();
   for (let k = 0; k < count; k++) {
     if (p + 46 > len || u32(p) !== 0x02014b50) return fail("damaged archive (central directory)");
     const flags = u16(p + 8), method = u16(p + 10), csize = u32(p + 20), usize = u32(p + 24);
     const nlen = u16(p + 28), xlen = u16(p + 30), clen = u16(p + 32), loff = u32(p + 42);
     if (p + 46 + nlen > len) return fail("damaged archive (entry name)");
-    const path = names.decode(bytes.subarray(p + 46, p + 46 + nlen));
+    const path = decodeName(bytes.subarray(p + 46, p + 46 + nlen), flags);
     p += 46 + nlen + xlen + clen;
     if (path.endsWith("/") || path.endsWith("\\")) continue; // a folder
     if (flags & 1) { skipped.push({ path, reason: "encrypted (password-protected)" }); continue; }
     if (method !== 0 && method !== 8) { skipped.push({ path, reason: `unsupported compression method ${method}` }); continue; }
     if (csize === 0xffffffff || usize === 0xffffffff) { skipped.push({ path, reason: "Zip64 entry" }); continue; }
     if (loff + 30 > len || u32(loff) !== 0x04034b50) { skipped.push({ path, reason: "damaged entry" }); continue; }
+    // several directory entries pointing at the same data: a zip bomb trick, never unpack it twice
+    if (usedOffsets.has(loff)) { skipped.push({ path, reason: "overlaps another entry (same data)" }); continue; }
+    usedOffsets.add(loff);
     const start = loff + 30 + u16(loff + 26) + u16(loff + 28);
     if (start + csize > len) { skipped.push({ path, reason: "damaged entry (truncated)" }); continue; }
     const body = bytes.subarray(start, start + csize);
@@ -89,7 +112,8 @@ export async function unzip(bytes, limits = {}) {
       const r = await inflate(body, Math.min(L.maxEntry, room));
       if (r.broken) { skipped.push({ path, reason: "damaged compressed data" }); continue; }
       if (r.over) {
-        if (L.maxEntry <= room) { entries.push({ path, bytes: new Uint8Array(0), tooLarge: true }); continue; }
+        total += r.inflated;
+        if (L.maxEntry <= room && total <= L.maxTotal) { entries.push({ path, bytes: new Uint8Array(0), tooLarge: true }); continue; }
         return fail(`unpacks to more than ${size(L.maxTotal)}; stopped`);
       }
       data = r.data;
