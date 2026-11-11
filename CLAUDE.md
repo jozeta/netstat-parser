@@ -36,7 +36,8 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 
 ## Layout
 
-- `index.html`: entry page (strict CSP, viewport, Låda Glass app shell)
+- `index.html`: entry page (strict CSP, viewport, Låda Glass app shell without the sidebar: pages,
+  theme and privacy note live in the top-right menu)
 - `css/app.css`, `js/app.js`: the app's own styles and script (no build step)
 - `vendor/lada-glass/1.1.1/`: the Låda Glass design system (copied; update with claude-check's advice)
 - `tests/`: `node --test` tests; `tests/fixtures/` hand-written netstat samples per format (committed)
@@ -46,6 +47,10 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
   UTF-16/code pages), `header.js`, `detect.js` (line-shape scoring), `states.js` (en/sv/de state
   words, mojibake-tolerant), one parser per format, `common.js` shared helpers, `types.js` typedefs
 - `js/lib/cidr.js`: CIDR math and the default internal ranges
+- `js/lib/zip.js`: defensive .zip reader (stored/deflate via `DecompressionStream`, limits enforced while
+  unpacking); `js/lib/inputs.js`: which folder/archive files to parse, `expandArchives` (used by the worker)
+- `js/ui/dropped.js`: walks dropped folders; `js/ui/collapse.js`: default expand/collapse (Settings
+  `graph.expandUpTo`, default 30, applied to groups seen for the first time)
 - `js/model/`: `build.js` (`buildModel(files, settings)` → hosts/groups/edges), `settings.js`
   (defaults, `validateSettings`, `classify`), `filter.js` (`parseQuery`, `applyFilter`), `exports.js`
   (CSV, targets), `session.js` (save/open, untrusted import), `dns.js` (DoH PTR, injected fetch)

@@ -22,8 +22,8 @@ repo), which merged `*.txt` netstat files into a yEd `.graphml` file. Lessons fr
 
 ## Goals
 
-1. Load many netstat files (drag-and-drop or file picker, multiple at once) from Windows, Linux and
-   macOS, auto-detecting the format. Everything is processed locally in the browser.
+1. Load many netstat files (drag-and-drop or file picker, multiple at once, or a whole folder or
+   `.zip` archive) from Windows, Linux and macOS, auto-detecting the format. Everything is processed locally in the browser.
 2. Draw an interactive graph of hosts and connections, with subnets grouped and public
    addresses grouped into an "Internet" cloud.
 3. Colour connections by protocol risk; show listening services; show whether each connection was
@@ -150,8 +150,10 @@ added to it.
     configured in Settings) are grouped by subnet. Subnet = the configured range if one matches,
     else the prefix from the header `addresses`, else a default /24 (IPv4) or /64 (IPv6).
   - Everything else goes into one **Internet** cloud node.
-  - Groups start **collapsed** when the graph is large (builder picks the threshold, e.g. > ~150
-    hosts); a collapsed group shows host/connection counts and its aggregated edges carry the count
+  - A group starts **expanded** if it has at most N hosts (Settings, default **30**; owner decision
+    2026-11-11) and **collapsed** otherwise. The rule applies to groups that appear for the first
+    time, so it never undoes the user's own expand/collapse; changing N in Settings re-applies it
+    to every group. A collapsed group shows host/connection counts and its aggregated edges carry the count
     and the worst risk colour. Expand/collapse on click or keyboard.
 - **Edges**: one edge per `{hostA, hostB, servicePort, proto}`.
   - **Service port**: if one side's port is a listening port in that host's file, use it; else the
@@ -185,9 +187,20 @@ added to it.
 
 ### UI
 
-- Layout: top bar (load files, search/filter, settings, export, "How to collect"), graph canvas in
-  the middle, details panel on the right. On narrow screens the panel becomes a bottom sheet.
-- Empty state explains how to start and links to "How to collect".
+- Layout (owner decision 2026-11-11): no left sidebar. A slim top bar holds the app name and a
+  **menu button (hamburger) in the top right corner**; its menu has the pages (Graph, How to
+  collect, Settings), the theme switch and the privacy note. Below it: the toolbar (load files or a
+  folder, search/filter, export…), the graph canvas in the middle, the details panel on the right. On narrow screens the panel becomes a bottom sheet.
+- Empty state explains how to start (files, a folder or a zip) and links to "How to collect".
+- **Folders and zip files**: dropping a folder reads every file in it (recursively); a `.zip` file
+  (dropped, picked or inside a dropped folder) is unpacked in the parse worker with the browser's
+  own `DecompressionStream` (no library, nothing uploaded). From folders and archives only likely
+  netstat files are read (`.txt`, `.log`, `.out` or no extension; macOS/Windows junk such as
+  `.DS_Store`, `__MACOSX/`, `._*`, `Thumbs.db` is skipped) and the load summary says how many
+  were skipped. Files picked one by one are always read. Archives are untrusted: stored and
+  deflate entries only; encrypted, Zip64 and nested archives are skipped with a reason; limits of
+  50 MB per entry, 200 MB per archive file, 500 MB unpacked in total and 10,000 entries, enforced
+  while unpacking (a zip bomb stops at the limit).
 - Load summary after import: files parsed, hosts, connections, unrecognised files/lines.
 - **Details panel** for: host (identity, IPs, OS, role, tags, listening ports, connections,
   source file, parse warnings), group/cloud (range, name, member count, top talkers), edge
@@ -209,7 +222,7 @@ Stored in `localStorage` (settings only, never job data), with export/import as 
 - Protocol table: port, proto, name, risk level (add / edit / remove).
 - Subnets: CIDR → name; also which ranges count as internal.
 - Role rules (tag name → required listening ports).
-- Graph: collapse threshold, labels on/off.
+- Graph: expand groups with up to N hosts (default 30), labels on/off.
 - DNS lookup (below).
 
 ### DNS lookup (opt-in, browser)

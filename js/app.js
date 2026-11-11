@@ -6,9 +6,12 @@ import { parseQuery, applyFilter } from "./model/filter.js";
 import { connectionsCsv, hostsCsv, targetsFile } from "./model/exports.js";
 import { createSession, parseSession } from "./model/session.js";
 import { mergeSessionSettings } from "./model/settings.js";
-import { MAX_FILE_BYTES } from "./worker-core.js";
+import { MAX_FILE_BYTES, MAX_ARCHIVE_BYTES } from "./worker-core.js";
+import { isCandidate } from "./lib/inputs.js";
+import { walkEntries } from "./ui/dropped.js";
 import { resolvePtrs, RESOLVERS } from "./model/dns.js";
 import { toElements } from "./ui/elements.js";
+import { defaultCollapsed } from "./ui/collapse.js";
 import { createGraph } from "./ui/graph.js";
 import { hostDetails, groupDetails, edgeDetails, mergedDetails, hostsList, groupsList, filesList } from "./ui/panel.js";
 import { el, replace, download } from "./ui/dom.js";
@@ -27,6 +30,7 @@ const state = {
   dns: {},
   positions: {},
   collapsed: new Set(),
+  known: new Set(), // groups that already got their default expand/collapse state
   dirty: false,
   selected: null,
   query: "",
@@ -91,6 +95,7 @@ function showView() {
 window.addEventListener("hashchange", showView);
 
 function applySettings(next) {
+  if (next.graph.expandUpTo !== state.settings.graph.expandUpTo) state.known = new Set(); // re-apply to every group
   state.settings = next;
   if (!saveSettings(storage, next)) toast("Settings could not be stored in this browser (private mode?). They apply until you reload.", "warn");
   $("dns-btn").hidden = !next.dns.enabled;
@@ -99,9 +104,17 @@ function applySettings(next) {
 }
 
 // ---------- model + render ----------
-function rebuild({ relayout = false } = {}) {
+function rebuild({ relayout = false, adopt = false } = {}) {
   state.model = buildModel(state.files, state.settings);
   const m = state.model, sel = state.selected;
+  // new groups start expanded up to N hosts, collapsed above; groups with a state keep it
+  if (adopt) for (const id of m.groups.keys()) state.known.add(id);
+  const collapse = defaultCollapsed(m, state.settings.graph.expandUpTo, state.known);
+  for (const id of m.groups.keys()) {
+    if (state.known.has(id)) continue;
+    state.known.add(id);
+    if (collapse.has(id)) state.collapsed.add(id); else state.collapsed.delete(id);
+  }
   if (sel && !sel.startsWith("a:") && !m.hosts.has(sel) && !m.groups.has(sel) && !m.edges.has(sel)) state.selected = null;
   refresh({ relayout });
   renderFiles();
@@ -194,9 +207,11 @@ function parseInWorker(fileList) {
   const id = ++jobId;
   $("progress").hidden = false;
   $("progress-text").textContent = "Reading files…";
-  // files over the worker's limit are sent empty (it reports them as too large) instead of read into memory
-  return Promise.all([...fileList].map((f) => (f.size > MAX_FILE_BYTES ? Promise.resolve(new ArrayBuffer(0)) : f.arrayBuffer())
-    .then((buffer) => ({ name: f.name, buffer, tooLarge: f.size > MAX_FILE_BYTES }))))
+  // files over the worker's limit are sent empty (it reports them as too large) instead of read into memory;
+  // archives may be larger (their entries are limited one by one while unpacking)
+  const limit = (f) => (/\.zip$/i.test(f.name) ? MAX_ARCHIVE_BYTES : MAX_FILE_BYTES);
+  return Promise.all([...fileList].map((f) => (f.size > limit(f) ? Promise.resolve(new ArrayBuffer(0)) : f.arrayBuffer())
+    .then((buffer) => ({ name: f.name, buffer, tooLarge: f.size > limit(f) }))))
     .then((files) => new Promise((resolve, reject) => {
       $("progress").hidden = false;
       pending.set(id, (err) => { worker.removeEventListener("message", onMsg); reject(err); });
@@ -207,7 +222,7 @@ function parseInWorker(fileList) {
           worker.removeEventListener("message", onMsg);
           pending.delete(id);
           if (pending.size === 0) $("progress").hidden = true;
-          if (ev.data.type === "done") resolve(ev.data.parsed); else reject(new Error(ev.data.message));
+          if (ev.data.type === "done") resolve({ parsed: ev.data.parsed, notes: ev.data.notes }); else reject(new Error(ev.data.message));
         }
       };
       worker.addEventListener("message", onMsg);
@@ -215,23 +230,40 @@ function parseInWorker(fileList) {
     }));
 }
 
-async function loadFiles(fileList) {
-  if (!fileList?.length) return;
+/**
+ * @param {ArrayLike<File>} fileList
+ * @param {{skipped?: number, truncated?: boolean}} [found] what a folder walk left out
+ */
+async function loadFiles(fileList, found = {}) {
+  if (!fileList?.length) {
+    if (found.skipped) toast(`No netstat files found (${found.skipped} other files skipped).`, "warn");
+    return;
+  }
   const gen = generation;
-  let parsed;
-  try { parsed = await parseInWorker(fileList); } catch (e) { toast(`Could not read the files: ${e.message}`, "bad"); return; }
+  let parsed, notes;
+  try { ({ parsed, notes } = await parseInWorker(fileList)); } catch (e) { toast(`Could not read the files: ${e.message}`, "bad"); return; }
+  if (!parsed.length) {
+    toast(`No netstat files found${notes.problems.length ? `: ${notes.problems[0]}` : ""}.`, "warn");
+    return;
+  }
   if (gen !== generation) { toast("Files parsed after a session was opened were discarded. Load them again to add them.", "warn"); return; }
-  const wasEmpty = state.files.length === 0;
   uniqueFileNames(parsed.map((p) => p.fileName)).forEach((name, i) => { parsed[i].fileName = name; });
   const byName = new Map(state.files.map((f) => [f.fileName, f]));
   for (const p of parsed) byName.set(p.fileName, p); // same name → replaced
   state.files = [...byName.values()];
   const model = buildModel(state.files, state.settings);
-  if (wasEmpty && model.hosts.size > state.settings.graph.collapseThreshold) state.collapsed = new Set(model.groups.keys());
   setDirty();
   rebuild();
   const bad = parsed.filter((p) => p.warnings.notRecognised).length;
-  toast(`${parsed.length} files read: ${model.hosts.size} hosts, ${model.edges.size} connections.${bad ? ` ${bad} not recognised (see Files).` : ""}`, bad ? "warn" : "ok");
+  const skipped = (found.skipped ?? 0) + notes.skipped;
+  const extra = [
+    bad ? `${bad} not recognised (see Files).` : "",
+    skipped ? `${skipped} other files skipped.` : "",
+    found.truncated ? "Stopped at 10,000 files." : "",
+    notes.problems.length ? `${notes.problems.length} archive problem${notes.problems.length > 1 ? "s" : ""}: ${notes.problems.slice(0, 2).join("; ")}${notes.problems.length > 2 ? " …" : ""}` : "",
+  ].filter(Boolean).join(" ");
+  toast(`${parsed.length} files read: ${model.hosts.size} hosts, ${model.edges.size} connections.${extra ? ` ${extra}` : ""}`,
+    bad || notes.problems.length || found.truncated ? "warn" : "ok");
 }
 
 // ---------- exports / sessions ----------
@@ -259,10 +291,10 @@ async function openSession(file) {
     generation++;
     // the session's tables apply to this job only: DNS opt-in and the user's internal ranges are kept, nothing is stored
     const settings = mergeSessionSettings(state.settings, s.settings);
-    Object.assign(state, { files: s.files, settings, dns: s.dns, positions: s.positions, collapsed: new Set(s.collapsed), selected: null });
+    Object.assign(state, { files: s.files, settings, dns: s.dns, positions: s.positions, collapsed: new Set(s.collapsed), known: new Set(), selected: null });
     $("dns-btn").hidden = !settings.dns.enabled;
     setDirty(false);
-    rebuild();
+    rebuild({ adopt: true });
     toast(`Session opened: ${s.files.length} files.`);
   } catch (e) {
     toast(e.message, "bad");
@@ -313,7 +345,24 @@ function init() {
   const card = $("graph").parentElement;
   card.addEventListener("dragover", (ev) => { ev.preventDefault(); $("graph").classList.add("np-drop"); });
   card.addEventListener("dragleave", () => $("graph").classList.remove("np-drop"));
-  card.addEventListener("drop", (ev) => { ev.preventDefault(); $("graph").classList.remove("np-drop"); loadFiles(ev.dataTransfer.files); });
+  card.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    $("graph").classList.remove("np-drop");
+    // entries must be taken during the event; folders are walked, plain files are read as they are
+    const entries = [...(ev.dataTransfer.items ?? [])].map((it) => it.webkitGetAsEntry?.()).filter(Boolean);
+    if (entries.some((e) => e.isDirectory)) {
+      $("progress").hidden = false;
+      $("progress-text").textContent = "Reading folder…";
+      walkEntries(entries).then((r) => { $("progress").hidden = true; loadFiles(r.files, r); },
+        (e) => { $("progress").hidden = true; toast(`Could not read the folder: ${e?.message ?? e}`, "bad"); });
+    } else loadFiles(ev.dataTransfer.files);
+  });
+  $("folder-input").addEventListener("change", (ev) => {
+    const all = [...ev.target.files];
+    const files = all.filter((f) => /\.zip$/i.test(f.name) || isCandidate(f.webkitRelativePath || f.name));
+    loadFiles(files, { skipped: all.length - files.length });
+    ev.target.value = "";
+  });
 
   let timer = null;
   $("search").addEventListener("input", (ev) => {
@@ -343,6 +392,20 @@ function init() {
   $("expand-btn").addEventListener("click", () => { state.collapsed = new Set(); setDirty(); refresh({ fit: true }); });
   $("dns-btn").hidden = !state.settings.dns.enabled;
   $("dns-btn").addEventListener("click", runDns);
+
+  // app menu (top right): pages, theme, privacy note
+  const appMenu = $("app-menu"), menuBtn = $("menu-btn");
+  const setAppMenu = (open, { focusButton = false } = {}) => {
+    appMenu.hidden = !open;
+    menuBtn.setAttribute("aria-expanded", String(open));
+    if (open) appMenu.querySelector('a[aria-current="page"], a')?.focus();
+    else if (focusButton) menuBtn.focus();
+  };
+  menuBtn.addEventListener("click", () => setAppMenu(appMenu.hidden));
+  appMenu.addEventListener("click", (ev) => { if (ev.target.closest("a[href]")) setAppMenu(false); });
+  appMenu.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.preventDefault(); setAppMenu(false, { focusButton: true }); } });
+  appMenu.addEventListener("focusout", (ev) => { if (ev.relatedTarget && !appMenu.contains(ev.relatedTarget) && ev.relatedTarget !== menuBtn) setAppMenu(false); });
+  document.addEventListener("click", (ev) => { if (!appMenu.hidden && !ev.target.closest(".np-appmenu")) setAppMenu(false); });
 
   const menu = $("export-menu");
   const setMenu = (open) => { menu.hidden = !open; $("export-btn").setAttribute("aria-expanded", String(open)); if (open) menu.querySelector("button")?.focus(); };

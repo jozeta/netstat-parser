@@ -15,24 +15,29 @@
   <script type="module" src="js/app.js"></script>
 </head>
 <body class="lg lg-backdrop">
-  <div class="lg-app">
-    <nav class="lg-sidebar" aria-label="Main">
-      <div class="lg-brand"><span class="lg-mark"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#layers"/></svg></span>netstat-parser</div>
-      <div class="lg-nav">
-        <a href="#graph" data-view="graph" aria-current="page"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#overview"/></svg>Graph</a>
-        <a href="#collect" data-view="collect"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#terminal"/></svg>How to collect</a>
-        <a href="#settings" data-view="settings"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#settings"/></svg>Settings</a>
-      </div>
-      <div class="np-theme">
-        <span class="lg-small lg-muted" id="theme-label">Theme</span>
-        <div class="lg-tabs" role="radiogroup" aria-labelledby="theme-label">
-          <button class="lg-tab" type="button" role="radio" data-theme-choice="system" aria-checked="true">System</button>
-          <button class="lg-tab" type="button" role="radio" data-theme-choice="dark" aria-checked="false" tabindex="-1">Dark</button>
-          <button class="lg-tab" type="button" role="radio" data-theme-choice="light" aria-checked="false" tabindex="-1">Light</button>
+  <div class="lg-app np-app">
+    <header class="np-topbar">
+      <a class="lg-brand np-brand" href="#graph"><span class="lg-mark"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#layers"/></svg></span>netstat-parser</a>
+      <div class="np-appmenu">
+        <button class="lg-btn lg-btn-icon np-menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="app-menu" title="Menu"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#menu"/></svg><span class="np-visually-hidden">Menu</span></button>
+        <div class="lg-popup np-app-menu" id="app-menu" hidden>
+          <nav class="lg-nav" aria-label="Main">
+            <a href="#graph" data-view="graph" aria-current="page"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#overview"/></svg>Graph</a>
+            <a href="#collect" data-view="collect"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#terminal"/></svg>How to collect</a>
+            <a href="#settings" data-view="settings"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#settings"/></svg>Settings</a>
+          </nav>
+          <div class="np-theme">
+            <span class="lg-small lg-muted" id="theme-label">Theme</span>
+            <div class="lg-tabs" role="radiogroup" aria-labelledby="theme-label">
+              <button class="lg-tab" type="button" role="radio" data-theme-choice="system" aria-checked="true">System</button>
+              <button class="lg-tab" type="button" role="radio" data-theme-choice="dark" aria-checked="false" tabindex="-1">Dark</button>
+              <button class="lg-tab" type="button" role="radio" data-theme-choice="light" aria-checked="false" tabindex="-1">Light</button>
+            </div>
+          </div>
+          <p class="lg-small lg-muted np-privacy"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#lock"/></svg>Files stay in this browser. Nothing is uploaded.</p>
         </div>
       </div>
-      <p class="lg-small lg-muted np-privacy"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#lock"/></svg>Files stay in this browser. Nothing is uploaded.</p>
-    </nav>
+    </header>
 
     <main class="lg-main">
       <!-- ============ Graph ============ -->
@@ -44,8 +49,10 @@
 
         <div class="lg-card np-toolbar" role="toolbar" aria-label="Graph tools">
           <label class="lg-btn lg-btn-primary" for="file-input"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#upload"/></svg>Load files</label>
-          <input id="file-input" class="np-visually-hidden" type="file" multiple accept=".txt,.log,text/plain">
-          <label class="lg-btn" for="session-input"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#folder"/></svg>Open session</label>
+          <input id="file-input" class="np-visually-hidden" type="file" multiple accept=".txt,.log,.out,.zip,text/plain,application/zip">
+          <label class="lg-btn" for="folder-input"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#folder"/></svg>Load folder</label>
+          <input id="folder-input" class="np-visually-hidden" type="file" webkitdirectory multiple>
+          <label class="lg-btn" for="session-input"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#file"/></svg>Open session</label>
           <input id="session-input" class="np-visually-hidden" type="file" accept=".json,application/json">
           <div class="np-search">
             <label class="np-visually-hidden" for="search">Search and filter</label>
@@ -105,8 +112,8 @@
             <div id="graph" class="np-graph" aria-label="Network graph. Use the Hosts list in the panel to navigate with the keyboard." role="img"></div>
             <div class="lg-empty np-empty" id="empty">
               <svg class="lg-icon np-empty-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#upload"/></svg>
-              <strong>Drop netstat files here</strong>
-              <span>or use <em>Load files</em>. Windows, Linux (netstat or ss) and macOS output, as many as you like. <a href="#collect">How to collect them</a>.</span>
+              <strong>Drop netstat files, a folder or a zip here</strong>
+              <span>Files, a whole folder or a <code class="lg-code">.zip</code>, or use <em>Load files</em> / <em>Load folder</em>. Windows, Linux (netstat or ss) and macOS output, as many as you like. <a href="#collect">How to collect them</a>.</span>
             </div>
             <div class="np-progress" id="progress" hidden><span class="lg-chip" id="progress-text">Parsing…</span></div>
             <ul class="np-legend lg-small" aria-label="Legend">

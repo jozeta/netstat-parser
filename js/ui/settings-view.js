@@ -56,7 +56,7 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
   const ruleTable = table(["Tag", "All of ports", "Any of ports", ""], settings.roleRules.map(ruleRow));
   const internal = el("textarea", { class: "lg-input", id: "internal-ranges", rows: 3, placeholder: "203.0.113.0/24" });
   internal.value = settings.internalRanges.join("\n");
-  const threshold = input(settings.graph.collapseThreshold, { type: "number", min: 10, max: 100000, id: "collapse-threshold" });
+  const threshold = input(settings.graph.expandUpTo, { type: "number", min: 0, max: 100000, id: "expand-up-to" });
   const labels = el("input", { type: "checkbox", class: "lg-toggle", id: "labels-toggle" });
   labels.checked = settings.graph.labels;
   const dnsOn = el("input", { type: "checkbox", class: "lg-toggle", id: "dns-enabled" });
@@ -92,9 +92,9 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
     const okRanges = validateSettings({ internalRanges: ranges }).internalRanges;
     if (okRanges.length !== ranges.length) { bad++; internal.classList.add("np-invalid"); }
     const t = Number(threshold.value);
-    if (!(Number.isInteger(t) && t >= 10 && t <= 100000)) { bad++; threshold.classList.add("np-invalid"); }
+    if (!(Number.isInteger(t) && t >= 0 && t <= 100000)) { bad++; threshold.classList.add("np-invalid"); }
     if (dnsOn.checked && (!resolver.value || !ack.checked)) { bad++; resolver.classList.add("np-invalid"); }
-    return { bad, next: { protocols, subnets, internalRanges: okRanges, roleRules, graph: { collapseThreshold: t, labels: labels.checked },
+    return { bad, next: { protocols, subnets, internalRanges: okRanges, roleRules, graph: { expandUpTo: t, labels: labels.checked },
       dns: { enabled: dnsOn.checked, resolver: resolver.value || null } } };
   }
 
@@ -137,7 +137,8 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
       el("button", { class: "lg-btn", type: "button", onclick: () => tbody(ruleTable).append(ruleRow({ tag: "", all: [], any: [] })) }, "Add tag")),
     el("section", { class: "lg-card lg-stack", "aria-labelledby": "s-graph" },
       el("h2", { class: "lg-subtitle", id: "s-graph" }, "Graph"),
-      el("div", { class: "lg-field" }, el("label", { for: "collapse-threshold" }, "Collapse groups when there are more hosts than"), threshold),
+      el("div", { class: "lg-field" }, el("label", { for: "expand-up-to" }, "Expand subnets with up to this many hosts"), threshold,
+        el("span", { class: "lg-small lg-muted" }, "Larger subnets (and a larger Internet group) start collapsed. 0 collapses all.")),
       el("label", { class: "np-inline", for: "labels-toggle" }, labels, "Show labels and port badges on nodes")),
     el("section", { class: "lg-card lg-stack", "aria-labelledby": "s-dns" },
       el("h2", { class: "lg-subtitle", id: "s-dns" }, "DNS lookup (optional)"),

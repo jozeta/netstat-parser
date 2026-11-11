@@ -46,7 +46,7 @@ function stylesheet(large = false) {
       "bounds-expansion": (ele) => Math.ceil(0.62 * ele.height()) + 4, "text-margin-y": (ele) => -Math.round(0.3 * ele.height()), "font-size": 16, "font-weight": 700,
       color: token("--np-internet-text", text), "text-background-opacity": 0 } },
     { selector: "node.collapsed", style: { "background-opacity": 0.35 } },
-    { selector: "node.collapsed", style: { width: 96, height: 52, "text-valign": "center", "font-size": 11, "text-max-width": 90 } },
+    { selector: "node.collapsed", style: { width: 140, height: 76, "text-valign": "center", "font-size": 14, "text-max-width": 130 } },
     { selector: "node.collapsed.internet", style: { shape: "round-rectangle", width: 160, height: 98, "background-opacity": 0,
       "background-width": "100%", "background-height": "100%", "background-position-y": "50%", "bounds-expansion": 0,
       "text-margin-y": 10, "font-size": 12 } },

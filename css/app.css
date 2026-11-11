@@ -68,7 +68,17 @@
   clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .np-view { min-width: 0; }
 .np-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--lg-space-s); }
-.np-theme { display: grid; gap: var(--lg-space-xxs); padding: 0 var(--lg-space-s); }
+/* ---- shell: no sidebar; a slim top bar with the app menu in the top right corner ---- */
+.lg-app.np-app { grid-template-columns: minmax(0, 1fr); gap: var(--lg-space-s); }
+.np-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--lg-space-s); min-width: 0; }
+.np-brand { padding: 0; color: var(--lg-text); text-decoration: none; }
+.np-appmenu { position: relative; }
+.np-app-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 270px; max-width: calc(100vw - 2 * var(--lg-space-s));
+  display: grid; gap: var(--lg-space-s); padding: var(--lg-space-s); box-sizing: border-box;
+  background: var(--lg-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.np-app-menu .lg-nav { display: grid; gap: 2px; }
+.np-app-menu .np-privacy { margin: 0; display: flex; gap: var(--lg-space-xs); align-items: flex-start; }
+.np-theme { display: grid; gap: var(--lg-space-xxs); }
 .np-theme .lg-tabs { display: flex; width: 100%; box-sizing: border-box; }
 .np-theme .lg-tab { flex: 1; padding: 4px 6px; }
 .np-theme .lg-tab[aria-checked="true"] { background: var(--lg-glass-strong); color: var(--lg-text); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
@@ -101,7 +111,7 @@
 
 /* ---- workspace ---- */
 .np-work { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--lg-space-s); min-height: 0; }
-.np-graph-card { position: relative; padding: 0; overflow: hidden; min-height: 520px; height: calc(100vh - 170px); }
+.np-graph-card { position: relative; padding: 0; overflow: hidden; min-height: 520px; height: calc(100vh - 215px); }
 .np-graph { position: absolute; inset: 0; }
 .np-graph.np-drop { outline: 2px dashed var(--lg-accent); outline-offset: -6px; }
 .np-empty { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--lg-space-xs); background: none; border: 0; }
@@ -171,15 +181,11 @@
   .np-graph-card { min-height: 60vh; height: 70vh; }
 }
 @media (max-width: 760px) {
-  .np-privacy { display: none; }
   .np-legend { position: static; margin: var(--lg-space-s); }
   .np-graph-card { display: flex; flex-direction: column; justify-content: flex-end; }
   /* the menu spans the toolbar instead of hanging off the Export button (no sideways scroll) */
   .np-menu { position: static; }
   .np-menu-list { left: var(--lg-space-s); right: var(--lg-space-s); top: auto; width: auto; }
-  .lg-sidebar { flex-wrap: wrap; }
-  .np-theme { flex-basis: 100%; display: flex; align-items: center; gap: var(--lg-space-s); padding: 0 var(--lg-space-xs); }
-  .np-theme .lg-tabs { width: auto; flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }

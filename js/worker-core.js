@@ -3,6 +3,7 @@
 import { decodeBytes } from "./parse/decode.js";
 import { parseFile } from "./parse/index.js";
 import { cleanText } from "./parse/header.js";
+import { expandArchives } from "./lib/inputs.js";
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -22,4 +23,17 @@ export function handleBatch(batch, onProgress) {
     onProgress(i + 1, batch.length);
     return result;
   });
+}
+
+/** Archives (.zip) may be this large; their entries are held to MAX_FILE_BYTES each. */
+export const MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
+
+/**
+ * A batch as dropped or picked: unpack .zip files (likely netstat entries only), then parse.
+ * @param {{name: string, bytes: Uint8Array, tooLarge?: boolean}[]} batch
+ * @param {(done: number, total: number) => void} onProgress
+ */
+export async function handleUpload(batch, onProgress) {
+  const { files, notes } = await expandArchives(batch);
+  return { parsed: handleBatch(files, onProgress), notes };
 }

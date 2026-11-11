@@ -41,13 +41,13 @@ test("classify with defaults", () => {
 });
 
 test("validateSettings falls back per field and sanitises", () => {
-  const s = validateSettings({ protocols: [{ port: "x" }], subnets: [{ cidr: "10.0.0.0/8", name: "<b>A</b>" + "x".repeat(100) }], graph: { collapseThreshold: -5 } });
+  const s = validateSettings({ protocols: [{ port: "x" }], subnets: [{ cidr: "10.0.0.0/8", name: "<b>A</b>" + "x".repeat(100) }], graph: { expandUpTo: -5 } });
   assert.deepEqual(s.protocols, DEFAULT_SETTINGS.protocols);
   assert.equal(s.subnets.length, 1);
   assert.equal(s.subnets[0].cidr, "10.0.0.0/8");
   assert.ok(s.subnets[0].name.startsWith("<b>A</b>"));
   assert.equal(s.subnets[0].name.length, 64);
-  assert.equal(s.graph.collapseThreshold, 150);
+  assert.equal(s.graph.expandUpTo, 30);
   assert.deepEqual(validateSettings(null), DEFAULT_SETTINGS);
   assert.deepEqual(validateSettings(JSON.parse(JSON.stringify(DEFAULT_SETTINGS))), DEFAULT_SETTINGS);
   assert.equal(validateSettings({ dns: { enabled: true, resolver: "evil" } }).dns.resolver, null);
@@ -61,4 +61,15 @@ test("DEFAULT_SETTINGS role rules", () => {
     { tag: "Web", all: [], any: [80, 443] },
     { tag: "RDP", all: [], any: [3389] },
   ]);
+});
+
+test("graph.expandUpTo: default 30, 0 allowed (all collapsed), old collapseThreshold ignored", () => {
+  assert.equal(DEFAULT_SETTINGS.graph.expandUpTo, 30);
+  assert.equal(validateSettings({ graph: { expandUpTo: 0 } }).graph.expandUpTo, 0);
+  assert.equal(validateSettings({ graph: { expandUpTo: 75 } }).graph.expandUpTo, 75);
+  assert.equal(validateSettings({ graph: { expandUpTo: 2.5 } }).graph.expandUpTo, 30);
+  assert.equal(validateSettings({ graph: { expandUpTo: 100001 } }).graph.expandUpTo, 30);
+  const old = validateSettings({ graph: { collapseThreshold: 150 } }).graph;
+  assert.equal(old.expandUpTo, 30);
+  assert.ok(!("collapseThreshold" in old));
 });

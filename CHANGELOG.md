@@ -4,6 +4,13 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- Load a whole folder (drop it, or **Load folder**) or a `.zip` of netstat files. Zips are unpacked
+  in the browser with limits against zip bombs; junk such as `.DS_Store` and `__MACOSX/` and
+  non-text files are skipped and counted in the load summary.
+- Subnets with up to 30 hosts start expanded, larger ones collapsed; the number is in Settings
+  (Graph) and changing it re-applies the rule. Replaces the old whole-job collapse threshold.
+- The left sidebar is gone: pages, theme and the privacy note are in a menu in the top right corner.
+- Collapsed groups are larger and easier to read.
 - The Internet group is drawn as a cloud (flat base, overlapping lobes) in both themes, expanded
   and collapsed; the layout leaves room for it.
 - Selecting a host, group or connection focuses it: everything outside its neighbourhood fades.

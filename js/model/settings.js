@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     { tag: "Web", all: [], any: [80, 443] },
     { tag: "RDP", all: [], any: [3389] },
   ],
-  graph: { collapseThreshold: 150, labels: true },
+  graph: { expandUpTo: 30, labels: true }, // groups with up to N hosts start expanded
   dns: { enabled: false, resolver: null },
 });
 
@@ -100,8 +100,8 @@ export function validateSettings(input) {
     out.roleRules = input.roleRules.length === 0 || rules.length ? rules : d.roleRules;
   }
   if (input.graph && typeof input.graph === "object") {
-    const t = input.graph.collapseThreshold;
-    if (Number.isInteger(t) && t >= 10 && t <= 100000) out.graph.collapseThreshold = t;
+    const t = input.graph.expandUpTo;
+    if (Number.isInteger(t) && t >= 0 && t <= 100000) out.graph.expandUpTo = t;
     if (typeof input.graph.labels === "boolean") out.graph.labels = input.graph.labels;
   }
   if (input.dns && typeof input.dns === "object") {

@@ -17,7 +17,7 @@ requests unless you switch on the optional DNS lookup.
   output), Linux `netstat` and `ss`, and macOS `netstat`. The format is detected automatically,
   and both IPv4 and IPv6 are handled.
 - **Network graph:** hosts are grouped by subnet, and public addresses go into an "Internet" cloud.
-  Large jobs start with the groups collapsed.
+  Subnets with up to 30 hosts start expanded and larger ones collapsed (the number is a setting).
 - **Risk colours:** red for vulnerable protocols (e.g. Telnet, FTP), orange for exploitable or
   unencrypted ones (e.g. SMB, RDP, HTTP), neutral for safe ones (e.g. SSH, HTTPS).
 - **Coverage at a glance:**
@@ -32,7 +32,7 @@ requests unless you switch on the optional DNS lookup.
   edit the role rules.
 - **Optional DNS lookup** for Internet addresses via DNS-over-HTTPS (Cloudflare, Google or Quad9).
   It's off by default, and the app warns you before sending anything.
-- **Dark and light themes:** follows your system, or pick Dark or Light in the sidebar.
+- **Dark and light themes:** follows your system, or pick Dark or Light in the menu (top right).
 - **Exports:**
   - PNG
   - a saved session (`.json`) you can reopen later
@@ -55,7 +55,9 @@ python3 -m http.server 8580      # then open http://localhost:8580/ (or: claude-
 
 1. On each computer, run the command for its OS from the app's **How to collect** page. It writes
    `<hostname>_netstat.txt`.
-2. Open the app, click **Load files** (or drop the files on the graph), and select them all.
+2. Open the app and drop the files on the graph, or a whole folder, or a `.zip` of them (or use
+   **Load files** / **Load folder**). From folders and zips only likely netstat files are read
+   (`.txt`, `.log`, `.out`, no extension); the rest is skipped and counted.
 3. Click hosts, groups or lines for details; search with `port:445 risk:red`, `collected:no`,
    `seen:one` and so on; name your subnets and tune the protocol risk table in **Settings**.
 4. **Export → Session** saves the job to reopen later (nothing is saved automatically).
