@@ -40,16 +40,18 @@ Export **Collector targets** from the graph for a starting list, or write one by
 [targets.example.txt](targets.example.txt)). One target per line, `#` comments:
 
 ```
-<host> <ssh|winrm> [user=NAME] [port=N] [key=PATH] [password-env=VAR] [domain=NAME]
+<host> <ssh|winrm> [user=NAME] [port=N] [key=PATH] [password-env=NP_VAR] [domain=NAME]
 ```
 
 - **ssh**: keys or ssh-agent only (`BatchMode`, no password prompts). `key=` selects a private key.
   Your `~/.ssh/config` applies as usual.
 - **winrm**: port 5985 (HTTP, NTLM/Kerberos message encryption) by default, 5986 for HTTPS.
   `domain=CORP` with `user=admin` logs in as `CORP\admin`. The password comes from the
-  environment variable named by `password-env=`, or is asked once per user before the run starts.
+  environment variable named by `password-env=` (it must start with `NP_`, e.g. `NP_CORP_PW`, so a
+  targets file can't send any other secret from your environment), or is asked once per user
+  before the run starts.
 
-A bad line stops the run before anything is contacted, with every problem listed by line number.
+Review a targets file you didn't write before running it. A bad line stops the run before anything is contacted, with every problem listed by line number.
 SMB and pass-the-hash are deliberately not supported.
 
 ## Security notes
@@ -57,8 +59,10 @@ SMB and pass-the-hash are deliberately not supported.
 - Passwords are never written to disk and are scrubbed from every message the collector prints.
   Targets files hold host lists and user names: they are client data, so keep them out of git
   (`targets*.txt` is gitignored here).
-- Remote output is treated as untrusted: capped at 50 MB, saved as bytes, never echoed to the
-  terminal. Remote error text has control characters removed before it is shown. File names come
+- Remote output is treated as untrusted: capped at 50 MB (ssh is stopped as soon as it passes the
+  cap; WinRM output is buffered by pypsrp, so its cap applies after it arrives), saved as bytes,
+  never echoed to the terminal. Output without the netstat-parser header counts as a failure.
+  `--timeout` is an overall limit per target for both methods. Remote error text has control characters removed before it is shown. File names come
   from the returned hostname, reduced to letters, digits, `.`, `_` and `-`.
 - Host names and key paths that start with `-` are rejected, and `ssh` gets the host after `--`,
   so a targets file can't inject ssh options.

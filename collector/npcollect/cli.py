@@ -110,7 +110,10 @@ def main(argv=None, *, env=os.environ, prompt=getpass.getpass, out=sys.stdout, e
                 raise remote.MissingExtra("skipped: WinRM needs the pypsrp package: python3 -m pip install pypsrp")
             key = ("env", t.password_env) if t.password_env else ("user", _winrm_user(t))
             data = run_winrm(t, passwords[key], verify_tls=not args.no_verify_tls, timeout=args.timeout)
-        base = safe_name(host_from_header(data) or "") or safe_name(t.host) or f"target-line-{t.line}"
+        claimed = host_from_header(data)
+        if claimed is None:
+            raise remote.CollectError("no netstat-parser header in the output (is the remote shell POSIX sh / PowerShell?)")
+        base = safe_name(claimed) or safe_name(t.host) or f"target-line-{t.line}"
         return write_output(folder, base, data)
 
     ok = failed = 0
@@ -123,7 +126,8 @@ def main(argv=None, *, env=os.environ, prompt=getpass.getpass, out=sys.stdout, e
             except Exception as e:  # one target's failure never stops the run
                 failed += 1
                 reason = str(e) if isinstance(e, remote.CollectError) else f"{type(e).__name__}: {e}"
-                print(f"FAIL {t.host} ({t.method}): {redactor.scrub(clean_message(reason))}", file=err)
+                # scrub first: cleaning and truncating could split a secret so it no longer matches
+                print(f"FAIL {t.host} ({t.method}): {clean_message(redactor.scrub(reason))}", file=err)
             else:
                 ok += 1
                 print(f"ok   {t.host} ({t.method}) -> {path}", file=out)

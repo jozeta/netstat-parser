@@ -3,6 +3,7 @@
 import importlib
 import os
 import subprocess
+import threading
 from pathlib import Path
 
 from .output import clean_message
@@ -22,6 +23,10 @@ class MissingExtra(CollectError):
     """An optional dependency is not installed."""
 
 
+def _size(n: int) -> str:
+    return f"{n // (1024 * 1024)} MB" if n >= 1024 * 1024 else f"{n} bytes"
+
+
 def _bare(host: str) -> str:
     return host[1:-1] if host.startswith("[") and host.endswith("]") else host
 
@@ -39,28 +44,63 @@ def ssh_argv(t: Target, *, accept_new: bool, connect_timeout: int = 10) -> list:
     return argv + ["--", _bare(t.host), "sh", "-s"]
 
 
-def run_ssh(t: Target, *, accept_new: bool, timeout: int, run=subprocess.run, max_bytes: int = MAX_BYTES) -> bytes:
+def run_ssh(t: Target, *, accept_new: bool, timeout: float, popen=subprocess.Popen, max_bytes: int = MAX_BYTES) -> bytes:
+    """Run the POSIX script over ssh. Output is read as it arrives and ssh is killed past max_bytes
+    or after timeout seconds, so a hostile host can't fill the operator's memory."""
     argv = ssh_argv(t, accept_new=accept_new)
     try:
-        done = run(argv, input=POSIX_SCRIPT.encode(), capture_output=True, timeout=timeout)
+        proc = popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except FileNotFoundError:
         raise CollectError("ssh client not found on this machine (install OpenSSH)") from None
+    out, err, too_big = bytearray(), bytearray(), threading.Event()
+
+    def read_out():
+        while True:
+            chunk = proc.stdout.read(65536)
+            if not chunk:
+                return
+            out.extend(chunk)
+            if len(out) > max_bytes:
+                too_big.set()
+                proc.kill()
+                return
+
+    def read_err():
+        err.extend(proc.stderr.read(65536))  # the first 64 kB of error text is plenty
+
+    readers = [threading.Thread(target=read_out, daemon=True), threading.Thread(target=read_err, daemon=True)]
+    for r in readers:
+        r.start()
+    try:
+        proc.stdin.write(POSIX_SCRIPT.encode())
+        proc.stdin.close()
+    except OSError:
+        pass  # ssh exited early; its exit code and stderr say why
+    try:
+        code = proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-        raise CollectError(f"timed out after {timeout} s") from None
-    if done.returncode != 0:
-        detail = clean_message(done.stderr.decode("utf-8", errors="replace")) or "no error text"
-        raise CollectError(f"ssh exit {done.returncode}: {detail}")
-    if len(done.stdout) > max_bytes:
-        raise CollectError(f"output is more than {max_bytes // (1024 * 1024)} MB; not saved")
-    return done.stdout
+        proc.kill()
+        raise CollectError(f"timed out after {timeout:g} s") from None
+    for r in readers:
+        r.join(timeout=5)
+    if too_big.is_set():
+        raise CollectError(f"output is more than {_size(max_bytes)}; not saved; ssh was stopped")
+    if code != 0:
+        detail = clean_message(bytes(err).decode("utf-8", errors="replace")) or "no error text"
+        raise CollectError(f"ssh exit {code}: {detail}")
+    return bytes(out)
 
 
 def _pypsrp_client():
     return importlib.import_module("pypsrp.client").Client
 
 
-def run_winrm(t: Target, password: str, *, verify_tls: bool, timeout: int, client_factory=None,
+def run_winrm(t: Target, password: str, *, verify_tls: bool, timeout: float, client_factory=None,
               importer=_pypsrp_client, max_bytes: int = MAX_BYTES) -> bytes:
+    """Run the PowerShell script over WinRM. pypsrp's own timeouts are per socket read, so the whole
+    call also runs under an overall time limit. Error text is returned raw: the caller scrubs
+    secrets first and cleans afterwards. pypsrp buffers the whole output, so the size cap is
+    checked after it arrives (documented)."""
     if client_factory is None:
         try:
             client_factory = importer()
@@ -72,17 +112,29 @@ def run_winrm(t: Target, password: str, *, verify_tls: bool, timeout: int, clien
     if t.domain and "\\" not in user and "@" not in user:
         user = f"{t.domain}\\{user}"
     port = t.port or 5985
-    try:
-        client = client_factory(server, username=user, password=password, port=port, ssl=port == 5986,
-                                cert_validation=verify_tls, auth="negotiate",
-                                connection_timeout=timeout, read_timeout=timeout)
-        output, streams, had_errors = client.execute_ps(POWERSHELL_SCRIPT)
-    except Exception as e:  # pypsrp raises many types; all mean "this target failed"
-        raise CollectError(clean_message(f"{type(e).__name__}: {e}")) from None
+    result = {}
+
+    def call():
+        try:
+            client = client_factory(server, username=user, password=password, port=port, ssl=port == 5986,
+                                    cert_validation=verify_tls, auth="negotiate",
+                                    connection_timeout=timeout, read_timeout=timeout)
+            result["value"] = client.execute_ps(POWERSHELL_SCRIPT)
+        except Exception as e:  # pypsrp raises many types; all mean "this target failed"
+            result["error"] = f"{type(e).__name__}: {e}"
+
+    worker = threading.Thread(target=call, daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        raise CollectError(f"timed out after {timeout:g} s")
+    if "error" in result:
+        raise CollectError(result["error"])
+    output, streams, had_errors = result["value"]
     if had_errors and not output:
         errors = "; ".join(str(x) for x in getattr(streams, "error", [])) or "unknown error"
-        raise CollectError(clean_message(f"PowerShell error: {errors}"))
+        raise CollectError(f"PowerShell error: {errors}")
     data = output.encode("utf-8")
     if len(data) > max_bytes:
-        raise CollectError(f"output is more than {max_bytes // (1024 * 1024)} MB; not saved")
+        raise CollectError(f"output is more than {_size(max_bytes)}; not saved")
     return data

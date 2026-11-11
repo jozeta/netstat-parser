@@ -12,7 +12,9 @@ from typing import List, Optional, Tuple
 
 METHODS = ("ssh", "winrm")
 KEYS = ("user", "port", "key", "password-env", "domain")
-_ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Only NP_* variables: a targets file (untrusted) must not be able to send an arbitrary secret from
+# the operator's environment, such as AWS_SECRET_ACCESS_KEY, as the password to a host it names.
+_ENV_NAME = re.compile(r"^NP_[A-Za-z0-9_]+$")
 _HOST = re.compile(r"^[A-Za-z0-9._:%\[\]-]+$")
 
 
@@ -75,7 +77,7 @@ def _parse_line(fields: List[str], line: int) -> Tuple[Optional[Target], Optiona
     if env is not None and method == "ssh":
         return None, "ssh takes no password (keys or ssh-agent only); remove password-env="
     if env is not None and not _ENV_NAME.match(env):
-        return None, f"password-env '{env}' is not a valid environment variable name"
+        return None, f"password-env '{env}' must be an environment variable whose name starts with NP_ (e.g. NP_CORP_PW)"
     if "domain" in values and method == "ssh":
         return None, "domain= only applies to winrm"
     return Target(host=host, method=method, line=line, user=values.get("user"), port=port,

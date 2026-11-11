@@ -43,7 +43,7 @@ const TARGETS_HEADER = `# netstat-parser collector targets
 # One target per line: <host> <method> [key=value ...]
 #   methods: ssh|winrm
 #   keys:    user port key password-env domain
-# Passwords are never stored here: use password-env=NAME or answer the prompt.
+# Passwords are never stored here: use password-env=NP_NAME (an NP_* variable) or answer the prompt.
 # Generated from hosts that appear in collected files but have no file of their own.
 # The method is a guess from the ports the host serves; check it before running.
 `;

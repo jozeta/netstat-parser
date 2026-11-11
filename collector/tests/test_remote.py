@@ -31,48 +31,85 @@ class SshArgv(unittest.TestCase):
         self.assertEqual(argv[-3], "fe80::1%en0")
 
 
+class FakePopen:
+    """Stands in for subprocess.Popen: stdout/stderr are byte streams, kill() is recorded."""
+
+    def __init__(self, stdout=b"", stderr=b"", returncode=0, hang=False, chunks=None):
+        self.out, self.err, self.rc, self.hang = stdout, stderr, returncode, hang
+        self.killed, self.stdin_data, self.argv, self.kw = False, None, None, None
+        self.chunks = chunks
+
+    def __call__(self, argv, **kw):
+        import io
+        self.argv, self.kw = argv, kw
+        outer = self
+
+        class In(io.BytesIO):
+            def close(self):
+                outer.stdin_data = self.getvalue()
+                super().close()
+
+        class Endless(io.RawIOBase):
+            def readable(self):
+                return True
+
+            def readinto(self, b):
+                if outer.killed:
+                    return 0
+                n = len(b)
+                b[:n] = b"y" * n
+                return n
+
+        self.stdin = In()
+        self.stdout = Endless() if self.chunks == "endless" else io.BytesIO(self.out)
+        self.stderr = io.BytesIO(self.err)
+        self.returncode = None
+        return self
+
+    def wait(self, timeout=None):
+        import subprocess as sp
+        if self.hang and not self.killed:
+            raise sp.TimeoutExpired(self.argv, timeout)
+        self.returncode = -9 if self.killed else self.rc
+        return self.returncode
+
+    def kill(self):
+        self.killed = True
+
+
 class RunSsh(unittest.TestCase):
     def test_feeds_script_on_stdin_and_returns_stdout(self):
-        seen = {}
-
-        def fake_run(argv, **kw):
-            seen.update(kw, argv=argv)
-            return subprocess.CompletedProcess(argv, 0, stdout=b"### netstat-parser v1\n", stderr=b"")
-
-        out = run_ssh(T, accept_new=False, timeout=30, run=fake_run)
+        fake = FakePopen(stdout=b"### netstat-parser v1\n")
+        out = run_ssh(T, accept_new=False, timeout=30, popen=fake)
         self.assertEqual(out, b"### netstat-parser v1\n")
-        self.assertEqual(seen["input"], POSIX_SCRIPT.encode())
-        self.assertEqual(seen["timeout"], 30)
-        self.assertNotIn("shell", seen)
+        self.assertEqual(fake.stdin_data, POSIX_SCRIPT.encode())
+        self.assertEqual(fake.argv, ssh_argv(T, accept_new=False))
+        self.assertNotIn("shell", fake.kw)
 
     def test_failure_message_is_cleaned(self):
-        def fake_run(argv, **kw):
-            return subprocess.CompletedProcess(argv, 255, stdout=b"", stderr=b"\x1b[31mPermission denied\x07 (publickey).\r\n")
-
+        fake = FakePopen(stderr=b"\x1b[31mPermission denied\x07 (publickey).\r\n", returncode=255)
         with self.assertRaises(CollectError) as cm:
-            run_ssh(T, accept_new=False, timeout=30, run=fake_run)
+            run_ssh(T, accept_new=False, timeout=30, popen=fake)
         self.assertEqual(str(cm.exception), "ssh exit 255: [31mPermission denied (publickey).")
 
-    def test_timeout(self):
-        def fake_run(argv, **kw):
-            raise subprocess.TimeoutExpired(argv, kw["timeout"])
-
+    def test_timeout_kills_ssh(self):
+        fake = FakePopen(hang=True)
         with self.assertRaisesRegex(CollectError, "timed out after 30 s"):
-            run_ssh(T, accept_new=False, timeout=30, run=fake_run)
+            run_ssh(T, accept_new=False, timeout=30, popen=fake)
+        self.assertTrue(fake.killed)
 
-    def test_too_large(self):
-        def fake_run(argv, **kw):
-            return subprocess.CompletedProcess(argv, 0, stdout=b"x" * 11, stderr=b"")
-
+    def test_endless_output_is_cut_off_at_the_cap(self):
+        fake = FakePopen(chunks="endless")
         with self.assertRaisesRegex(CollectError, "more than"):
-            run_ssh(T, accept_new=False, timeout=30, run=fake_run, max_bytes=10)
+            run_ssh(T, accept_new=False, timeout=30, popen=fake, max_bytes=100_000)
+        self.assertTrue(fake.killed)
 
     def test_missing_ssh_binary(self):
-        def fake_run(argv, **kw):
+        def popen(argv, **kw):
             raise FileNotFoundError("ssh")
 
         with self.assertRaisesRegex(CollectError, "ssh client not found"):
-            run_ssh(T, accept_new=False, timeout=30, run=fake_run)
+            run_ssh(T, accept_new=False, timeout=30, popen=popen)
 
 
 class FakeClient:
@@ -122,7 +159,7 @@ class RunWinrm(unittest.TestCase):
                 return "", Err(), True
 
         t = Target(host="h", method="winrm", line=1, user="u")
-        with self.assertRaisesRegex(CollectError, "^PowerShell error: Access is denied.\\[0m$"):
+        with self.assertRaisesRegex(CollectError, "^PowerShell error: Access is denied.\x1b\\[0m$"):
             run_winrm(t, "pw", verify_tls=True, timeout=60, client_factory=Failing)
 
     def test_client_exception_becomes_collect_error(self):
@@ -133,6 +170,20 @@ class RunWinrm(unittest.TestCase):
         t = Target(host="h", method="winrm", line=1, user="u")
         with self.assertRaisesRegex(CollectError, "RuntimeError: 401 Unauthorized"):
             run_winrm(t, "pw", verify_tls=True, timeout=60, client_factory=Boom)
+
+    def test_overall_timeout(self):
+        import time
+
+        class Slow(FakeClient):
+            def execute_ps(self, script):
+                time.sleep(2)
+                return "late", None, False
+
+        t = Target(host="h", method="winrm", line=1, user="u")
+        start = time.monotonic()
+        with self.assertRaisesRegex(CollectError, "timed out after 0.2 s"):
+            run_winrm(t, "pw", verify_tls=True, timeout=0.2, client_factory=Slow)
+        self.assertLess(time.monotonic() - start, 1.5)
 
     def test_missing_extra(self):
         def factory(*a, **k):

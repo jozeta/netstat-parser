@@ -60,10 +60,28 @@ class Cli(unittest.TestCase):
         self.assertEqual(h.files(), ["10.0.0.1_netstat.txt", "10.0.0.2_netstat.txt"])
         self.assertIn("2 collected, 0 failed", h.text())
 
-    def test_no_header_falls_back_to_target_name(self):
-        h = Harness("fe80::1 ssh\n", ssh=lambda t: b"Active Internet connections\n")
+    def test_output_without_header_is_a_failure(self):
+        for body in (b"", b"Active Internet connections\n"):
+            h = Harness("10.0.0.1 ssh\n", ssh=lambda t, body=body: body)
+            self.assertEqual(h.main(), 1)
+            self.assertEqual(h.files(), [])
+            self.assertIn("header", h.text())
+
+    def test_unsafe_hostname_falls_back_to_target_name(self):
+        h = Harness("fe80::1 ssh\n", ssh=lambda t: b"### netstat-parser v1\nhostname: ...\n### netstat\n")
         h.main()
         self.assertEqual(h.files(), ["fe80_1_netstat.txt"])
+
+    def test_secret_is_scrubbed_before_cleaning_and_truncation(self):
+        secret = "Hunter 2\twith  spaces"
+
+        def winrm(t, password):
+            raise CollectError("x" * 290 + " login failed: " + password)
+
+        h = Harness("DC01 winrm user=admin password-env=NP_PW\n", env={"NP_PW": secret}, winrm=winrm)
+        h.main()
+        for part in ("Hunter", "spaces", "with"):
+            self.assertNotIn(part, h.text())
 
     def test_one_failure_does_not_stop_the_run(self):
         def ssh(t):
@@ -90,7 +108,7 @@ class Cli(unittest.TestCase):
         def winrm(t, password):
             raise CollectError(f"login failed for password {password}")
 
-        h = Harness("DC01 winrm user=admin password-env=PW\n", env={"PW": "Hunter2!"}, winrm=winrm)
+        h = Harness("DC01 winrm user=admin password-env=NP_PW\n", env={"NP_PW": "Hunter2!"}, winrm=winrm)
         self.assertEqual(h.main(), 1)
         self.assertEqual(h.winrm_calls[0][1], "Hunter2!")
         self.assertNotIn("Hunter2!", h.text())
@@ -98,9 +116,9 @@ class Cli(unittest.TestCase):
         self.assertEqual(h.prompted, [])
 
     def test_missing_env_var_aborts(self):
-        h = Harness("DC01 winrm user=admin password-env=PW\n")
+        h = Harness("DC01 winrm user=admin password-env=NP_PW\n")
         self.assertEqual(h.main(), 2)
-        self.assertIn("PW", h.text())
+        self.assertIn("NP_PW", h.text())
         self.assertEqual(h.winrm_calls, [])
 
     def test_prompt_once_per_user_before_the_run(self):
@@ -121,19 +139,19 @@ class Cli(unittest.TestCase):
         self.assertIn("pypsrp", h.text())
 
     def test_dry_run_connects_to_nothing(self):
-        h = Harness("10.0.0.1 ssh user=root key=~/.ssh/id\nDC01 winrm user=admin password-env=PW\nDC02 winrm user=x\n",
-                    env={"PW": "Hunter2!"})
+        h = Harness("10.0.0.1 ssh user=root key=~/.ssh/id\nDC01 winrm user=admin password-env=NP_PW\nDC02 winrm user=x\n",
+                    env={"NP_PW": "Hunter2!"})
         self.assertEqual(h.main("--dry-run"), 0)
         self.assertEqual((h.ssh_calls, h.winrm_calls, h.prompted), ([], [], []))
         self.assertEqual(h.files(), [])
         t = h.text()
         self.assertIn("ssh -T", t)
-        self.assertIn("$PW", t)
+        self.assertIn("$NP_PW", t)
         self.assertIn("prompt", t)
         self.assertNotIn("Hunter2!", t)
 
     def test_options_reach_the_runners(self):
-        h = Harness("A winrm user=u password-env=PW\n", env={"PW": "x"})
+        h = Harness("A winrm user=u password-env=NP_PW\n", env={"NP_PW": "x"})
         h.main("--no-verify-tls", "--timeout", "15")
         kw = h.winrm_calls[0][2]
         self.assertEqual((kw["verify_tls"], kw["timeout"]), (False, 15))

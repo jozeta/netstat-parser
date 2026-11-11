@@ -254,7 +254,7 @@ scope; `smb` targets and `hash=` keys are rejected with a clear message.)*
   are skipped.
 - Input: a targets file, one target per line with its own method and credentials reference, e.g.
   `10.0.5.12 ssh user=root key=~/.ssh/id_ed25519`, `DC01 winrm user=admin domain=CORP
-  password-env=CORP_PW`. Format: UTF-8 text, one target per line, `#` comments (whole line or
+  password-env=NP_CORP_PW`. Format: UTF-8 text, one target per line, `#` comments (whole line or
   after whitespace), blank lines ignored; fields are whitespace-separated:
   `<host> <method> [key=value ...]` with method `ssh|winrm` and keys `user`, `port`, `key`,
   `password-env`, `domain`. Any invalid line aborts the run before anything connects, listing every
@@ -262,7 +262,8 @@ scope; `smb` targets and `hash=` keys are rejected with a clear message.)*
   with the method guessed from the ports the host serves (5985/5986 → winrm, 22 → ssh, Windows
   ports 445/135/3389 → winrm with a comment that WinRM must be enabled), and a header comment
   explaining the format.
-- WinRM passwords come from `password-env=NAME` or a prompt (asked once per user before the run
+- WinRM passwords come from `password-env=NP_NAME` (only `NP_*` variables, so a targets file can't
+  send any other secret from the operator's environment) or a prompt (asked once per user before the run
   starts); never written to disk or logs. SSH takes no passwords. Every message that is printed is
   scrubbed of known secret values.
 - Runs only read-only commands (the same collect commands as the app; one POSIX script that picks
@@ -271,11 +272,12 @@ scope; `smb` targets and `hash=` keys are rejected with a clear message.)*
   nothing.
 - Output: `<hostname>_netstat.txt` per target into an output folder (`--out`, default
   `./netstat-files`), hostname from the returned header, made filesystem-safe, falling back to the
-  target name; an existing file is never overwritten (`_2`, `_3`, … suffix). Remote output is
-  untrusted: capped at 50 MB, written as bytes, never echoed to the terminal; remote error text is
+  target name; output without the header is a failure; an existing file is never overwritten (`_2`, `_3`, … suffix). Remote output is
+  untrusted: capped at 50 MB (ssh output is streamed and ssh killed past the cap; pypsrp buffers
+  WinRM output, so that cap applies after arrival), written as bytes, never echoed to the terminal; remote error text is
   stripped of control characters and truncated before it is shown. A summary lists successes and
   failures; one failure does not stop the run; exit code 1 if any target failed. Concurrency: a
-  thread pool, `--workers` (default 8), per-target `--timeout` (default 120 s).
+  thread pool, `--workers` (default 8), per-target `--timeout` (default 120 s, an overall limit for WinRM too).
 - Tests (`python3 -m unittest discover -s collector`): parsing of the targets file, command
   construction, credential redaction in logs, output naming; remote execution mocked.
 
