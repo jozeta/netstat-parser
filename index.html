@@ -53,10 +53,10 @@
             <button class="lg-btn lg-btn-ghost lg-btn-icon" id="filter-help-btn" type="button" aria-expanded="false" aria-controls="filter-help" title="Filter help"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#info"/></svg><span class="np-visually-hidden">Filter help</span></button>
           </div>
           <div class="np-chips" aria-label="Quick filters">
-            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:red">Vulnerable</button>
-            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:orange">Exploitable</button>
-            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="seen:one">One end only</button>
-            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="collected:no">Not collected</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:red" aria-pressed="false"><span class="np-dot np-risk-vulnerable" aria-hidden="true"></span>Vulnerable</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:orange" aria-pressed="false"><span class="np-dot np-risk-exploitable" aria-hidden="true"></span>Exploitable</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="seen:one" aria-pressed="false"><span class="np-dot np-dot-dashed" aria-hidden="true"></span>One end only</button>
+            <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="collected:no" aria-pressed="false"><span class="np-dot np-host-seen" aria-hidden="true"></span>Not collected</button>
           </div>
           <label class="np-inline"><input id="hide-toggle" class="lg-toggle" type="checkbox"> Hide non-matching</label>
           <div class="np-actions">
@@ -104,7 +104,7 @@
           <div class="lg-card np-graph-card">
             <div id="graph" class="np-graph" aria-label="Network graph. Use the Hosts list in the panel to navigate with the keyboard." role="img"></div>
             <div class="lg-empty np-empty" id="empty">
-              <svg aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#upload"/></svg>
+              <svg class="lg-icon np-empty-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#upload"/></svg>
               <strong>Drop netstat files here</strong>
               <span>or use <em>Load files</em>. Windows, Linux (netstat or ss) and macOS output, as many as you like. <a href="#collect">How to collect them</a>.</span>
             </div>
@@ -116,6 +116,10 @@
               <li><span class="np-swatch np-risk-unclassified"></span>Unclassified</li>
               <li><span class="np-swatch np-line-one"></span>Seen from one end</li>
               <li><span class="np-swatch np-host-seen"></span>No file (greyed)</li>
+              <li class="np-legend-break"><span class="np-shape np-shape-client"></span>Client</li>
+              <li><span class="np-shape np-shape-server"></span>Server</li>
+              <li><span class="np-shape np-shape-both"></span>Both</li>
+              <li><svg class="np-legend-cloud" viewBox="0 0 200 120" aria-hidden="true"><path d="M18 104 A25.1 25.1 0 0 1 18 60 A25.1 25.1 0 0 1 18 16 A22.7 22.7 0 0 1 59 16 A22.7 22.7 0 0 1 100 16 A22.7 22.7 0 0 1 141 16 A22.7 22.7 0 0 1 182 16 A25.1 25.1 0 0 1 182 60 A25.1 25.1 0 0 1 182 104 A35.2 35.2 0 0 1 127 104 A35.2 35.2 0 0 1 73 104 A35.2 35.2 0 0 1 18 104 Z"/></svg>Internet</li>
             </ul>
           </div>
 

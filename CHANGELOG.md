@@ -4,6 +4,15 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- The Internet group is drawn as a cloud (flat base, overlapping lobes) in both themes, expanded
+  and collapsed; the layout leaves room for it.
+- Selecting a host, group or connection focuses it: everything outside its neighbourhood fades.
+- The graph refits when its area changes size (window, rotation) until you pan or zoom yourself;
+  Collapse all and Expand all refit too.
+- Quick filters are toggle chips with the legend's colours; the legend shows node shapes and the
+  Internet cloud; group titles stay readable when zoomed out; host labels hide when too small.
+- Fixes: the empty-state upload icon rendered as a black blob; Copy covered long collect commands;
+  a selection that no longer exists is cleared after a reload of files; "1 host" instead of "1 hosts".
 - Collector script (`collector/collect.py`, Python 3.9+): collects `<hostname>_netstat.txt` from
   the hosts in a targets file over SSH (system `ssh`, keys or agent) or WinRM (optional `pypsrp`),
   read-only commands only, `--dry-run`, passwords from environment variables or a prompt and

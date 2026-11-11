@@ -101,6 +101,8 @@ function applySettings(next) {
 // ---------- model + render ----------
 function rebuild({ relayout = false } = {}) {
   state.model = buildModel(state.files, state.settings);
+  const m = state.model, sel = state.selected;
+  if (sel && !sel.startsWith("a:") && !m.hosts.has(sel) && !m.groups.has(sel) && !m.edges.has(sel)) state.selected = null;
   refresh({ relayout });
   renderFiles();
   const hosts = state.model.hosts.size, edges = state.model.edges.size;
@@ -108,12 +110,12 @@ function rebuild({ relayout = false } = {}) {
   $("empty").hidden = state.files.length > 0;
 }
 
-function refresh({ relayout = false } = {}) {
+function refresh({ relayout = false, fit = false } = {}) {
   graph.resize();
   const terms = parseQuery(state.query);
   state.visible = terms.length ? applyFilter(state.model, terms) : null;
   const els = toElements(state.model, { collapsed: state.collapsed, visible: state.visible, mode: state.hide ? "hide" : "fade", dns: state.dns, labels: state.settings.graph.labels });
-  graph.render(els, state.positions, { relayout, fit: relayout });
+  graph.render(els, state.positions, { relayout, fit: relayout || fit });
   renderHosts();
   if (state.selected) { graph.select(state.selected, { center: false }); showDetails(state.selected); }
 }
@@ -337,8 +339,8 @@ function init() {
   });
   $("fit-btn").addEventListener("click", () => graph.fit());
   $("relayout-btn").addEventListener("click", () => { state.positions = {}; setDirty(); refresh({ relayout: true }); });
-  $("collapse-btn").addEventListener("click", () => { state.collapsed = new Set(state.model?.groups.keys() ?? []); setDirty(); refresh(); });
-  $("expand-btn").addEventListener("click", () => { state.collapsed = new Set(); setDirty(); refresh(); });
+  $("collapse-btn").addEventListener("click", () => { state.collapsed = new Set(state.model?.groups.keys() ?? []); setDirty(); refresh({ fit: true }); });
+  $("expand-btn").addEventListener("click", () => { state.collapsed = new Set(); setDirty(); refresh({ fit: true }); });
   $("dns-btn").hidden = !state.settings.dns.enabled;
   $("dns-btn").addEventListener("click", runDns);
 

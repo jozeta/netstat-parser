@@ -36,7 +36,7 @@ export function toElements(model, { collapsed, visible, mode, dns, labels }) {
     const anyOn = g.hostIds.some(hostOn);
     if (hide && !anyOn) continue;
     if (collapsed.has(g.id)) {
-      nodes.push({ data: { id: g.id, label: `${g.name}\n${g.hostIds.length} hosts`, count: g.hostIds.length, internal: 0, kind: g.kind, groupId: g.id },
+      nodes.push({ data: { id: g.id, label: `${g.name}\n${g.hostIds.length} host${g.hostIds.length === 1 ? "" : "s"}`, count: g.hostIds.length, internal: 0, kind: g.kind, groupId: g.id },
         classes: `collapsed group${kind}${anyOn ? "" : " faded"}` });
     } else {
       nodes.push({ data: { id: g.id, label: g.name, kind: g.kind, groupId: g.id }, classes: `group${kind}` });

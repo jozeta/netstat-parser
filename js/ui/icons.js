@@ -27,3 +27,25 @@ export function osIcon(os, color = "#8aa0bf") {
   return CACHE.get(id);
 }
 export const OS_LIST = Object.keys(GLYPHS);
+
+// Cloud outline for the Internet group, drawn the way icon sets draw clouds: a flat base and five
+// overlapping round lobes with one dominant dome (the union of circles at (44,112,r42) (72,62,r44)
+// (138,58,r56) (196,64,r42) (216,112,r42) over a flat bottom at y 154, in a 260 x 160 box).
+// The group's hosts sit in the safe box x 36-224, y 56-148; graph.js sizes and offsets the image so
+// that box matches the group, and layout.js reserves the room the lobes need.
+const CLOUD_PATH = "M44 154 A42 42 0 0 1 29.3 72.7 A44 44 0 0 1 93.7 23.7 A56 56 0 0 1 182.6 24.2 " +
+  "A42 42 0 0 1 236.4 75.3 A42 42 0 0 1 216 154 Z";
+const hex = (c, fallback) => (/^#[0-9a-f]{3,8}$/i.test(c) ? c : fallback);
+
+/**
+ * @param {string} fill   the theme's --np-internet
+ * @param {string} stroke the theme's --np-group-border
+ * @param {number} [alpha] fill opacity (Cytoscape ignores alpha in colours, so it is passed apart)
+ */
+export function cloudImage(fill, stroke, alpha = 0.14) {
+  const a = Number.isFinite(alpha) ? Math.min(1, Math.max(0, alpha)) : 0.14;
+  const body = `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="160" viewBox="0 0 260 160" preserveAspectRatio="none">` +
+    `<path d="${CLOUD_PATH}" fill="${hex(fill, "#5aaaff")}" fill-opacity="${a}" stroke="${hex(stroke, "#6a7f9f")}" ` +
+    `stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(body)}`;
+}

@@ -43,3 +43,13 @@ test("no two hosts share a position, and it is deterministic", () => {
   const keys = new Set(Object.values(a).map((p) => `${p.x},${p.y}`));
   assert.equal(keys.size, Object.keys(a).length);
 });
+
+test("the Internet group reserves room for its cloud outline", () => {
+  const host = (id, parent) => ({ data: { id, parent, role: "client", label: id }, classes: "host" });
+  const els = (kind) => ({ nodes: [
+    { data: { id: "g:a", kind: "subnet" }, classes: "group" }, host("a1", "g:a"),
+    { data: { id: "g:b", kind }, classes: "group" }, host("b1", "g:b"),
+  ], edges: [] });
+  const gap = (kind) => { const p = groupedLayout(els(kind)); return Math.hypot(p.b1.x - p.a1.x, p.b1.y - p.a1.y); };
+  assert.ok(gap("internet") >= gap("subnet") + 40, `${gap("internet")} vs ${gap("subnet")}`);
+});

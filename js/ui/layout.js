@@ -2,6 +2,10 @@
 // (shelf packing). Pure, fast for thousands of nodes, and never overlaps groups.
 
 const CELL_W = 130, CELL_H = 96, PAD = 60, GAP = 90, COLLAPSED_W = 150, COLLAPSED_H = 100;
+// The Internet group is drawn as a cloud (graph.js) whose lobes reach past the group's box:
+// about 19 % of its width on each side, 61 % of its height above and 13 % below.
+const gridSize = (n) => { const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.6))); return { cols, rows: Math.ceil(n / cols) }; };
+const cloudMargin = (w, h) => ({ x: Math.round(0.2 * w) + 10, top: Math.round(0.62 * h) + 10, bottom: Math.round(0.14 * h) + 10 });
 const ROLE_ORDER = { server: 0, both: 1, client: 2, unknown: 3 };
 
 /**
@@ -23,9 +27,11 @@ export function groupedLayout({ nodes, edges }) {
     const kids = children.get(n.data.id);
     if (kids?.length) {
       kids.sort((a, b) => (ROLE_ORDER[a.data.role] ?? 9) - (ROLE_ORDER[b.data.role] ?? 9) || (degree.get(b.data.id) ?? 0) - (degree.get(a.data.id) ?? 0) || String(a.data.label).localeCompare(String(b.data.label)));
-      const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length * 1.6)));
-      const rows = Math.ceil(kids.length / cols);
-      items.push({ id: n.data.id, kids, cols, w: cols * CELL_W + PAD, h: rows * CELL_H + PAD, internet: n.data.kind === "internet" });
+      const { cols, rows } = gridSize(kids.length);
+      const internet = n.data.kind === "internet";
+      const w = cols * CELL_W + PAD, h = rows * CELL_H + PAD;
+      const m = internet ? cloudMargin(w, h) : { x: 0, top: 0, bottom: 0 };
+      items.push({ id: n.data.id, kids, cols, mx: m.x, my: m.top, w: w + 2 * m.x, h: h + m.top + m.bottom, internet });
     } else {
       items.push({ id: n.data.id, kids: null, w: COLLAPSED_W, h: COLLAPSED_H, internet: n.data.kind === "internet" });
     }
@@ -40,7 +46,7 @@ export function groupedLayout({ nodes, edges }) {
     if (x > 0 && x + it.w > maxRow) { x = 0; y += rowH + GAP; rowH = 0; }
     if (it.kids) {
       it.kids.forEach((k, i) => {
-        pos[k.data.id] = { x: x + PAD / 2 + (i % it.cols) * CELL_W + CELL_W / 2, y: y + PAD / 2 + Math.floor(i / it.cols) * CELL_H + CELL_H / 2 };
+        pos[k.data.id] = { x: x + it.mx + PAD / 2 + (i % it.cols) * CELL_W + CELL_W / 2, y: y + it.my + PAD / 2 + Math.floor(i / it.cols) * CELL_H + CELL_H / 2 };
       });
     } else {
       pos[it.id] = { x: x + it.w / 2, y: y + it.h / 2 };

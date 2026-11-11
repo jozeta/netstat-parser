@@ -1,7 +1,7 @@
 // Cytoscape wrapper: stylesheet from CSS tokens, layout, selection, PNG export.
 import cytoscape from "../../vendor/cytoscape-3.34.4/cytoscape.esm.min.mjs";
 import { groupedLayout } from "./layout.js";
-import { osIcon, OS_LIST } from "./icons.js";
+import { cloudImage, osIcon, OS_LIST } from "./icons.js";
 
 const token = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
@@ -15,12 +15,15 @@ function stylesheet(large = false) {
   const text = token("--np-node-text", "#e8edf5");
   const select = token("--np-select", "#7cc4ff");
   const font = token("--lg-font", "system-ui, sans-serif");
+  const cloud = cloudImage(token("--np-internet", "#5aaaff"), token("--np-internet-border", token("--np-group-border", "#6a7f9f")),
+    Number(token("--np-internet-alpha", ".12")) * 1.4);
   return [
     { selector: "node", style: { label: "data(label)", color: text, "font-family": font, "font-size": 10, "text-wrap": "wrap",
       "text-max-width": 140, "min-zoomed-font-size": 5, "text-outline-width": 0 } },
     { selector: "node.host", style: { width: 34, height: 34, shape: "ellipse", "background-color": token("--np-node", "#2a3446"),
       "background-image": "data(icon)", "background-fit": "none", "background-width": "60%", "background-height": "60%", "background-position-x": "50%", "background-position-y": "50%", "background-clip": "none", "border-width": 2,
-      "border-color": token("--np-group-border", "#556"), "text-valign": "bottom", "text-margin-y": 7, "font-size": 9, "line-height": 1.25 } },
+      "border-color": token("--np-group-border", "#556"), "text-valign": "bottom", "text-margin-y": 7, "font-size": 9, "line-height": 1.25,
+      "min-zoomed-font-size": 7 } },
     ...OS_LIST.map((os) => ({ selector: `node.os-${os}`, style: { "background-image": osIcon(os, token("--np-icon", "#8aa0bf")) } })),
     { selector: "node.role-server", style: { shape: "round-rectangle" } },
     { selector: "node.role-both", style: { shape: "diamond", width: 40, height: 40 } },
@@ -31,11 +34,22 @@ function stylesheet(large = false) {
     { selector: "node.seen-only", style: { "background-color": token("--np-node-seen", "#3a3f48"), opacity: 0.55, "border-style": "dashed" } },
     { selector: "node.group", style: { shape: "round-rectangle", "background-color": token("--np-group", "#7896c8"),
       "background-opacity": Number(token("--np-group-alpha", ".1")), "border-width": 1, "border-color": token("--np-group-border", "#556"), "text-valign": "top",
-      "text-halign": "center", "font-size": 12, "font-weight": 600, padding: 14, "text-margin-y": -4 } },
-    { selector: "node.internet", style: { "background-color": token("--np-internet", "#5aaaff"), "background-opacity": Number(token("--np-internet-alpha", ".12")) } },
+      "text-halign": "center", "font-size": 15, "font-weight": 600, padding: 14, "text-margin-y": -4, "min-zoomed-font-size": 0,
+      "text-background-color": token("--np-label-bg", "#141a24"), "text-background-opacity": 0.75, "text-background-padding": 3,
+      "text-background-shape": "round-rectangle" } },
+    // The Internet group is a cloud image (the CSP allows data: images) on an invisible box. The
+    // image is 138 % x 174 % of the box and shifted up, so the box lands on the cloud's safe area
+    // (icons.js) and the lobes rise above the hosts; the label sits in the dome.
+    { selector: "node.internet", style: { "background-opacity": 0, "border-width": 0, "background-image": cloud,
+      "background-fit": "none", "background-width": "138.3%", "background-height": "173.9%", "background-position-x": "50%",
+      "background-position-y": "82.4%", "background-clip": "none", "background-image-containment": "over",
+      "bounds-expansion": (ele) => Math.ceil(0.62 * ele.height()) + 4, "text-margin-y": (ele) => -Math.round(0.3 * ele.height()), "font-size": 16, "font-weight": 700,
+      color: token("--np-internet-text", text), "text-background-opacity": 0 } },
     { selector: "node.collapsed", style: { "background-opacity": 0.35 } },
     { selector: "node.collapsed", style: { width: 96, height: 52, "text-valign": "center", "font-size": 11, "text-max-width": 90 } },
-    { selector: "node.collapsed.internet", style: { shape: "ellipse", width: 120, height: 64 } },
+    { selector: "node.collapsed.internet", style: { shape: "round-rectangle", width: 160, height: 98, "background-opacity": 0,
+      "background-width": "100%", "background-height": "100%", "background-position-y": "50%", "bounds-expansion": 0,
+      "text-margin-y": 10, "font-size": 12 } },
     { selector: "edge", style: { width: 1.6, "line-color": risk.unclassified, "target-arrow-color": risk.unclassified,
       "target-arrow-shape": "triangle", "arrow-scale": 0.7, "curve-style": large ? "haystack" : "bezier", opacity: 0.9 } },
     ...Object.entries(risk).map(([r, c]) => ({ selector: `edge.risk-${r}`, style: { "line-color": c, "target-arrow-color": c } })),
@@ -43,6 +57,11 @@ function stylesheet(large = false) {
       "text-rotation": "autorotate", "text-background-opacity": 0 } },
     { selector: "edge.seen-one", style: { "line-style": "dashed", "line-dash-pattern": [6, 4] } },
     { selector: ".faded", style: { opacity: 0.12 } },
+    // focus: everything outside the selection's neighbourhood steps back
+    { selector: "node.host.dim", style: { opacity: 0.18 } },
+    { selector: "node.group.dim", style: { "text-opacity": 0.4 } },
+    { selector: "edge.dim", style: { opacity: 0.05 } },
+    { selector: "edge.focus", style: { opacity: 1, width: 2.4, "z-index": 10 } },
     { selector: "edge.faded", style: { opacity: 0.06 } },
     { selector: ":selected", style: { "overlay-color": select, "overlay-opacity": 0.25, "overlay-padding": 4 } },
     { selector: "node.host:selected", style: { "border-color": select, "border-width": 3 } },
@@ -63,6 +82,28 @@ export function createGraph(container, handlers) {
     else handlers.onSelect(ev.target.id());
   });
   cy.on("dbltap", "node.group", (ev) => handlers.onToggleGroup(ev.target.id()));
+  // focus the selection: its own connections and neighbours stay, the rest steps back
+  const unfocus = () => cy.elements().removeClass("dim focus");
+  const focus = (ele) => {
+    unfocus();
+    let keep;
+    if (ele.isEdge()) keep = ele.union(ele.connectedNodes());
+    else if (ele.isParent()) keep = ele.union(ele.descendants()).union(ele.descendants().connectedEdges()).union(ele.descendants().neighborhood());
+    else keep = ele.closedNeighborhood();
+    keep = keep.union(keep.nodes().ancestors());
+    cy.batch(() => {
+      cy.elements().not(keep).addClass("dim");
+      keep.edges().addClass("focus");
+    });
+  };
+  cy.on("select", (ev) => focus(ev.target));
+  cy.on("unselect", () => { if (cy.$(":selected").empty()) unfocus(); });
+  // refit when the canvas changes size (rotation, panel, window) until the user moves the view
+  let userMoved = false;
+  cy.on("scrollzoom pinchzoom dragpan", () => { userMoved = true; });
+  if (typeof window.ResizeObserver === "function") {
+    new window.ResizeObserver(() => { cy.resize(); if (!userMoved && cy.nodes().length) cy.fit(undefined, 30); }).observe(container);
+  }
   cy.on("dragfree", "node", (ev) => {
     const moved = ev.target.isParent() ? ev.target.descendants().filter((n) => !n.isParent()) : ev.target;
     moved.forEach((n) => { const p = n.position(); handlers.onMoved(n.id(), { x: Math.round(p.x), y: Math.round(p.y) }); });
@@ -91,7 +132,7 @@ export function createGraph(container, handlers) {
       cy.endBatch();
       // only rebuild the stylesheet when the size class changes (appending rules every render leaks)
       if (isLarge !== large) { large = isLarge; restyle(); }
-      if (fit || relayout || !hadNodes) cy.fit(undefined, 30);
+      if (fit || relayout || !hadNodes) { cy.fit(undefined, 30); userMoved = false; }
       return Promise.resolve();
     },
     positions() {
@@ -105,7 +146,7 @@ export function createGraph(container, handlers) {
       const n = cy.getElementById(id);
       if (n.nonempty()) { n.select(); if (center) cy.animate({ center: { eles: n } }, { duration: reducedMotion() ? 0 : 250 }); }
     },
-    fit() { cy.fit(undefined, 30); },
+    fit() { cy.fit(undefined, 30); userMoved = false; },
     resize() { cy.resize(); },
     png(full) {
       return cy.png({ output: "blob", full, scale: 2, bg: getComputedStyle(document.body).backgroundColor || "#111" });

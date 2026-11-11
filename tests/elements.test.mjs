@@ -96,3 +96,13 @@ test("osIcon gives an SVG data URI per OS", () => {
   for (const os of ["windows", "linux", "macos", "unknown"]) assert.match(osIcon(os), /^data:image\/svg\+xml,/);
   assert.notEqual(osIcon("windows"), osIcon("linux"));
 });
+
+
+test("collapsed group labels count hosts in singular and plural", () => {
+  const one = [...model.groups.values()].find((g) => g.hostIds.length === 1);
+  const many = [...model.groups.values()].find((g) => g.hostIds.length > 1);
+  const els = toElements(model, { ...base, collapsed: new Set([one?.id, many.id].filter(Boolean)) });
+  const label = (id) => els.nodes.find((n) => n.data.id === id).data.label;
+  if (one) assert.match(label(one.id), /\n1 host$/);
+  assert.match(label(many.id), new RegExp(`\\n${many.hostIds.length} hosts$`));
+});
