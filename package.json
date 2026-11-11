@@ -5,7 +5,7 @@
   "description": "webapp that parses multiple netstat files from computers and builds a graph",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test \"tests/*.test.mjs\"",
     "lint": "eslint .",
     "test:collector": "python3 -m unittest discover -s collector/tests -t collector",
     "gen:data": "node scripts/generate-datasets.js"
