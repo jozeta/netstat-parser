@@ -22,8 +22,13 @@ jobs:
         run: npm run lint
       - name: Tests
         run: npm test
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-      - name: Collector tests
-        run: npm run test:collector
+
+  collector:
+    # the collector supports Python 3.9+; runner images no longer ship 3.9, so use the official image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container: python:3.9-slim
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collector tests (Python 3.9)
+        run: python3 -m unittest discover -s collector/tests -t collector
