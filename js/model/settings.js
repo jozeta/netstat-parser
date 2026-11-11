@@ -40,7 +40,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
     { tag: "RDP", all: [], any: [3389] },
   ],
   graph: { expandUpTo: 30, labels: true }, // groups with up to N hosts start expanded
-  dns: { enabled: false, resolver: null },
+  // acknowledged: the user accepted that public IPs go to the resolver; auto: look up after loading
+  dns: { enabled: false, resolver: null, acknowledged: false, auto: false },
+  // when files are loaded into a job that already has files: ask, merge or start a new job
+  load: { onMore: "ask" },
 });
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -71,7 +74,12 @@ const portList = (a) => (Array.isArray(a) ? a.filter(isPort).slice(0, 32) : []);
  * @param {unknown} input
  * @returns {typeof DEFAULT_SETTINGS}
  */
-export function validateSettings(input) {
+/**
+ * @param {unknown} input
+ * @param {{legacy?: boolean}} [opts] legacy: stored settings from before the acknowledgement was a
+ *   field of its own (enabling DNS then required it, so enabled implies it)
+ */
+export function validateSettings(input, { legacy = false } = {}) {
   const d = clone(DEFAULT_SETTINGS);
   if (!input || typeof input !== "object") return d;
   const out = d;
@@ -106,7 +114,12 @@ export function validateSettings(input) {
   }
   if (input.dns && typeof input.dns === "object") {
     const resolver = RESOLVER_IDS.includes(input.dns.resolver) ? input.dns.resolver : null;
-    out.dns = { enabled: input.dns.enabled === true && resolver !== null, resolver };
+    const enabled = input.dns.enabled === true && resolver !== null;
+    const acknowledged = input.dns.acknowledged === true || (legacy && enabled && !("acknowledged" in input.dns));
+    out.dns = { enabled, resolver, acknowledged, auto: enabled && acknowledged && input.dns.auto === true };
+  }
+  if (input.load && typeof input.load === "object" && ["ask", "merge", "new"].includes(input.load.onMore)) {
+    out.load = { onMore: input.load.onMore };
   }
   return out;
 }
@@ -136,6 +149,7 @@ export function classify(port, proto, settings) {
 export function mergeSessionSettings(current, fromSession) {
   const merged = clone(fromSession);
   merged.dns = clone(current.dns);
+  merged.load = clone(current.load); // a preference of this user, not of the job
   merged.internalRanges = [...new Set([...current.internalRanges, ...fromSession.internalRanges])];
   return validateSettings(merged);
 }

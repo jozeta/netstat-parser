@@ -23,7 +23,23 @@ function hostButton(model, id, onPick, sub) {
 }
 
 /** @param {{model, host, dns, onPick, conflicts}} ctx */
-export function hostDetails({ model, host: h, dns, onPick }) {
+/**
+ * @param {{disabled: boolean, busy: boolean, onClick: () => void}|null} [resolve] the per-host DNS
+ *   lookup, offered for Internet hosts only
+ */
+function resolveBlock(h, dns, resolve) {
+  if (!resolve) return null;
+  const ip = h.ips[0];
+  const status = resolve.disabled ? "Enable DNS lookup in Settings to use this."
+    : ip in dns ? (dns[ip] ? `Name found: ${dns[ip]}` : "No DNS name for this address (no PTR record).")
+      : "Looks up the DNS name (PTR record) of this address.";
+  return el("div", { class: "np-resolve" },
+    el("button", { class: "lg-btn", type: "button", id: "resolve-one", disabled: resolve.disabled || resolve.busy, onclick: resolve.onClick, "aria-describedby": "resolve-one-hint" },
+      resolve.busy ? "Looking up…" : ip in dns ? "Look up again" : "Resolve name"),
+    el("span", { class: "lg-small lg-muted", id: "resolve-one-hint" }, status));
+}
+
+export function hostDetails({ model, host: h, dns, onPick, resolve = null }) {
   const g = model.groups.get(h.groupId);
   const edges = [...model.edges.values()].filter((e) => e.source === h.id || e.target === h.id);
   const name = h.ips.map((ip) => dns[ip]).find(Boolean);
@@ -33,6 +49,7 @@ export function hostDetails({ model, host: h, dns, onPick }) {
       " ", ...h.tags.map((t) => el("span", { class: "lg-chip" }, t))),
     kv([["IP addresses", h.ips.join(", ") || "—"], ["DNS name", name ?? null], ["OS", OS_TEXT[h.os] ?? h.os], ["OS detail", h.osDetail],
       ["Role", ROLE_TEXT[h.role]], ["Subnet", g ? `${g.name}${g.cidr && g.cidr !== g.name ? ` (${g.cidr})` : ""}` : null]]),
+    resolveBlock(h, dns, resolve),
     h.warnings.length ? el("ul", { class: "np-warning lg-small" }, h.warnings.map((w) => el("li", null, w))) : null,
     title(`Listening (${h.listening.length})`),
     h.listening.length

@@ -191,6 +191,11 @@ added to it.
   **menu button (hamburger) in the top right corner**; its menu has the pages (Graph, How to
   collect, Settings), the theme switch and the privacy note. Below it: the toolbar (load files or a
   folder, search/filter, export…), the graph canvas in the middle, the details panel on the right. On narrow screens the panel becomes a bottom sheet.
+- **Loading into a job that already has files** asks: add the new files to the current job
+  (merge), or start a new job with only the new files (Cancel keeps everything as it is). The
+  default is a setting: ask (default), always merge, or always start a new job. A new job keeps
+  settings and forgets files, layout, group states and DNS results; the question warns when the
+  current job has unsaved changes. (Owner decision 2026-11-11.)
 - Empty state explains how to start (files, a folder or a zip) and links to "How to collect".
 - **Folders and zip files**: dropping a folder reads every file in it (recursively); a `.zip` file
   (dropped, picked or inside a dropped folder) is unpacked in the parse worker with the browser's
@@ -223,17 +228,28 @@ Stored in `localStorage` (settings only, never job data), with export/import as 
 - Subnets: CIDR → name; also which ranges count as internal.
 - Role rules (tag name → required listening ports).
 - Graph: expand groups with up to N hosts (default 30), labels on/off.
-- DNS lookup (below).
+- DNS lookup (below): enable, resolver, acknowledgement, automatic lookup after loading.
+- Loading: what to do when files are added to a job that already has files (ask / merge / new job).
 
 ### DNS lookup (opt-in, browser)
 
 - Reverse (PTR) lookups for **public (Internet) addresses only**, via DNS-over-HTTPS JSON API.
 - **Off by default.** Enabling it requires choosing a resolver from a fixed list (Cloudflare
-  `cloudflare-dns.com`, Google `dns.google`, Quad9 `dns.quad9.net`) and acknowledging a warning that
-  the client's public IPs are sent to that provider.
-- Runs on demand (button "Resolve Internet hosts", or for the current selection), rate-limited,
-  cancellable, with progress. Results are stored in the session file and shown as node labels, in
-  the panel and in search.
+  `cloudflare-dns.com`, Google `dns.google`, Quad9 `dns.quad9.net`). A separate checkbox
+  acknowledges that the client's public IPs are sent to that provider; until it is ticked, every
+  lookup shows that warning first and needs a confirmation (owner decision 2026-11-11).
+- Three ways to run it, all subject to the above:
+  - **Resolve DNS** in the toolbar: every unresolved Internet host. Rate-limited, cancellable,
+    with progress.
+  - **Resolve name** in the details panel of each Internet host: that one address, independent of
+    the toolbar run. Disabled (with a hint) while DNS lookup is not enabled.
+  - **Automatically after loading files** (Settings checkbox; only available once lookup is enabled
+    and the acknowledgement is ticked).
+- Never sent: internal ranges (default, Settings, named subnets), multicast/reserved, IPv6 forms
+  embedding IPv4 (NAT64, 6to4, Teredo), and documentation/benchmark ranges (192.0.2/24,
+  198.51.100/24, 203.0.113/24, 198.18/15, 2001:db8::/32), which never have public names. The
+  summary says how many were not sent.
+- Results are stored in the session file and shown as node labels, in the panel and in search.
 - CSP `connect-src` lists exactly those resolver origins; `.claude-standards` records the waiver
   and reason. Custom resolvers are out of scope for v1 (they would need a CSP change).
 

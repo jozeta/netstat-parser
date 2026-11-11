@@ -173,6 +173,7 @@
 .np-cmd pre { margin: 0; padding: var(--lg-space-s); overflow-x: auto; white-space: pre; font-family: var(--lg-mono); font-size: var(--lg-fs-mono);
   background: var(--lg-code); border-radius: var(--lg-radius-control); }
 .np-cmd .lg-btn { order: -1; align-self: flex-end; }
+.np-resolve { display: grid; gap: var(--lg-space-xxs); justify-items: start; margin: var(--lg-space-xs) 0; }
 .np-warning { border-left: 3px solid var(--lg-warn); padding-left: var(--lg-space-s); }
 
 @media (max-width: 1100px) {

@@ -4,6 +4,14 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- DNS: a **Resolve name** button in the details of each Internet host (disabled until DNS lookup
+  is enabled); an optional automatic lookup after loading files; the "I understand public IPs are
+  sent" acknowledgement is now its own setting, and until it is ticked every lookup asks first.
+  The toolbar's Resolve DNS always covers all Internet hosts. Documentation and benchmark
+  addresses (TEST-NET, 2001:db8::/32, 198.18/15) are never sent, and the summary says so.
+- Loading files into a job that already has files asks: add to the current job, or start a new
+  job (Cancel keeps everything). The default (ask / merge / new) is a setting.
+- "1 file", "1 host", "1 connection" instead of "1 files" etc.
 - Load a whole folder (drop it, or **Load folder**) or a `.zip` of netstat files. Zips are unpacked
   in the browser with limits against zip bombs; junk such as `.DS_Store` and `__MACOSX/` and
   non-text files are skipped and counted in the load summary.

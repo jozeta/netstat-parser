@@ -74,15 +74,15 @@ test("J: duplicate file names get a numbered suffix; sessions too", () => {
 });
 
 test("M: named subnets count as internal; DNS never sends them, nor NAT64/6to4/Teredo", async () => {
-  const s = validateSettings({ subnets: [{ cidr: "198.51.100.0/24", name: "Client DMZ" }] });
-  const ws = winFile("WS", [["TCP", "10.0.0.1:50000", "198.51.100.7:443", "ESTABLISHED"]]);
+  const s = validateSettings({ subnets: [{ cidr: "93.184.217.0/24", name: "Client DMZ" }] });
+  const ws = winFile("WS", [["TCP", "10.0.0.1:50000", "93.184.217.7:443", "ESTABLISHED"]]);
   const m = buildModel([ws], s);
-  assert.equal(m.hosts.get("ip:198.51.100.7").internal, true);
-  assert.equal(m.hosts.get("ip:198.51.100.7").groupId, "g:198.51.100.0/24");
+  assert.equal(m.hosts.get("ip:93.184.217.7").internal, true);
+  assert.equal(m.hosts.get("ip:93.184.217.7").groupId, "g:93.184.217.0/24");
   const sent = [];
   const fetch = async (u) => { sent.push(u); return { ok: true, json: async () => ({ Status: 3 }) }; };
-  await resolvePtrs(["64:ff9b::a00:1", "2002:a00:1::1", "2001:0:4136:e378::1", "198.51.100.7", "203.0.113.9"],
+  await resolvePtrs(["64:ff9b::a00:1", "2002:a00:1::1", "2001:0:4136:e378::1", "93.184.217.7", "93.184.216.9"],
     { resolver: "google", fetch, delayMs: 0, internalRanges: s.subnets.map((x) => x.cidr) });
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /9\.113\.0\.203/);
+  assert.match(sent[0], /9\.216\.184\.93/);
 });

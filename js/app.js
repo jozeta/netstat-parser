@@ -6,6 +6,7 @@ import { parseQuery, applyFilter } from "./model/filter.js";
 import { connectionsCsv, hostsCsv, targetsFile } from "./model/exports.js";
 import { createSession, parseSession } from "./model/session.js";
 import { mergeSessionSettings } from "./model/settings.js";
+import { resolveButton, shouldAutoResolve, loadChoice } from "./model/policy.js";
 import { MAX_FILE_BYTES, MAX_ARCHIVE_BYTES } from "./worker-core.js";
 import { isCandidate } from "./lib/inputs.js";
 import { walkEntries } from "./ui/dropped.js";
@@ -42,6 +43,7 @@ let graph = null;
 let dnsAbort = null;
 
 // ---------- small UI helpers ----------
+const count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 function toast(text, kind = "ok", ms = 6000) {
   const t = el("div", { class: `lg-toast lg-${kind}`, role: kind === "bad" ? "alert" : "status" }, el("div", null, text));
   $("toasts").append(t);
@@ -49,34 +51,49 @@ function toast(text, kind = "ok", ms = 6000) {
 }
 
 let dialogOpen = false;
-function confirmDialog(text, okLabel = "Continue") {
-  if (dialogOpen) return Promise.resolve(false); // one question at a time
+/**
+ * Modal question. Returns "ok", "alt" (the optional middle choice) or null (cancelled).
+ * @param {string} text
+ * @param {{ok?: string, alt?: string, title?: string}} [labels]
+ */
+function askDialog(text, { ok: okLabel = "Continue", alt: altLabel = null, title = "Confirm" } = {}) {
+  if (dialogOpen) return Promise.resolve(null); // one question at a time
   dialogOpen = true;
   return new Promise((resolve) => {
-    const d = $("dialog"), ok = $("dialog-ok"), cancel = $("dialog-cancel");
+    const d = $("dialog"), ok = $("dialog-ok"), alt = $("dialog-alt"), cancel = $("dialog-cancel");
     const opener = document.activeElement;
+    $("dialog-title").textContent = title;
     $("dialog-text").textContent = text;
     ok.textContent = okLabel;
+    alt.hidden = !altLabel;
+    alt.textContent = altLabel ?? "";
     d.hidden = false;
     ok.focus();
+    const buttons = () => [cancel, alt, ok].filter((b) => !b.hidden);
     const done = (v) => {
       d.hidden = true;
-      ok.onclick = cancel.onclick = null;
+      ok.onclick = alt.onclick = cancel.onclick = null;
       document.removeEventListener("keydown", keys, true);
       dialogOpen = false;
       if (opener instanceof HTMLElement && document.contains(opener)) opener.focus();
       resolve(v);
     };
-    // modal: Escape cancels, Tab cycles between the two buttons only
+    // modal: Escape cancels, Tab cycles between the dialog's buttons only
     const keys = (ev) => {
-      if (ev.key === "Escape") { ev.preventDefault(); done(false); }
-      if (ev.key === "Tab") { ev.preventDefault(); (document.activeElement === ok ? cancel : ok).focus(); }
+      if (ev.key === "Escape") { ev.preventDefault(); done(null); }
+      if (ev.key === "Tab") {
+        ev.preventDefault();
+        const list = buttons(), i = list.indexOf(document.activeElement);
+        list[(i + (ev.shiftKey ? -1 : 1) + list.length) % list.length].focus();
+      }
     };
     document.addEventListener("keydown", keys, true);
-    ok.onclick = () => done(true);
-    cancel.onclick = () => done(false);
+    ok.onclick = () => done("ok");
+    alt.onclick = () => done("alt");
+    cancel.onclick = () => done(null);
   });
 }
+const confirmDialog = (text, okLabel = "Continue") => askDialog(text, { ok: okLabel }).then((v) => v === "ok");
 
 function setDirty(v = true) { state.dirty = v && state.files.length > 0; }
 window.addEventListener("beforeunload", (ev) => { if (state.dirty) { ev.preventDefault(); ev.returnValue = ""; } });
@@ -119,7 +136,7 @@ function rebuild({ relayout = false, adopt = false } = {}) {
   refresh({ relayout });
   renderFiles();
   const hosts = state.model.hosts.size, edges = state.model.edges.size;
-  $("job-summary").textContent = state.files.length ? `${state.files.length} files · ${hosts} hosts · ${edges} connections` : "No files loaded";
+  $("job-summary").textContent = state.files.length ? `${count(state.files.length, "file")} · ${count(hosts, "host")} · ${count(edges, "connection")}` : "No files loaded";
   $("empty").hidden = state.files.length > 0;
 }
 
@@ -147,7 +164,12 @@ function showDetails(id) {
   const m = state.model;
   const pane = $("pane-details");
   if (!id) { replace(pane, el("p", { class: "lg-muted" }, "Click a host, group or connection to see its details.")); return; }
-  if (m.hosts.has(id)) replace(pane, hostDetails({ model: m, host: m.hosts.get(id), dns: state.dns, onPick: pick }));
+  if (m.hosts.has(id)) {
+    const host = m.hosts.get(id);
+    const b = resolveButton(state.settings);
+    const resolve = host.internal ? null : { disabled: b.disabled, busy: resolving.has(host.ips[0]), onClick: () => resolveOne(host) };
+    replace(pane, hostDetails({ model: m, host, dns: state.dns, onPick: pick, resolve }));
+  }
   else if (m.groups.has(id)) replace(pane, groupDetails({ model: m, group: m.groups.get(id), collapsed: state.collapsed.has(id), onToggle: toggleGroup, onPick: pick }));
   else if (m.edges.has(id)) replace(pane, edgeDetails({ model: m, edge: m.edges.get(id), onPick: pick }));
   else {
@@ -234,11 +256,31 @@ function parseInWorker(fileList) {
  * @param {ArrayLike<File>} fileList
  * @param {{skipped?: number, truncated?: boolean}} [found] what a folder walk left out
  */
+/** Forget the current job (files, layout, groups' state, DNS results); settings stay. */
+function resetJob() {
+  generation++;
+  dnsAbort?.abort();
+  Object.assign(state, { files: [], positions: {}, collapsed: new Set(), known: new Set(), dns: {}, selected: null });
+  setDirty(false);
+}
+
 async function loadFiles(fileList, found = {}) {
-  if (!fileList?.length) {
+  // copy first: an <input>'s FileList is live and is emptied when the input is reset, which
+  // happens while the "add or start new" question is still open
+  fileList = [...(fileList ?? [])];
+  if (!fileList.length) {
     if (found.skipped) toast(`No netstat files found (${found.skipped} other files skipped).`, "warn");
     return;
   }
+  const choice = loadChoice(state.settings, state.files.length);
+  let fresh = choice === "new";
+  if (choice === "ask") {
+    const answer = await askDialog(`${state.files.length} file${state.files.length > 1 ? "s are" : " is"} already loaded. Add the new files to this job, or start a new job with only the new files?${state.dirty ? " A new job discards the current one; it has unsaved changes." : ""} (The default can be set in Settings.)`,
+      { title: "Load more files", ok: "Add to current job", alt: "Start new job" });
+    if (!answer) return;
+    fresh = answer === "alt";
+  }
+  if (fresh) resetJob();
   const gen = generation;
   let parsed, notes;
   try { ({ parsed, notes } = await parseInWorker(fileList)); } catch (e) { toast(`Could not read the files: ${e.message}`, "bad"); return; }
@@ -262,8 +304,9 @@ async function loadFiles(fileList, found = {}) {
     found.truncated ? "Stopped at 10,000 files." : "",
     notes.problems.length ? `${notes.problems.length} archive problem${notes.problems.length > 1 ? "s" : ""}: ${notes.problems.slice(0, 2).join("; ")}${notes.problems.length > 2 ? " …" : ""}` : "",
   ].filter(Boolean).join(" ");
-  toast(`${parsed.length} files read: ${model.hosts.size} hosts, ${model.edges.size} connections.${extra ? ` ${extra}` : ""}`,
+  toast(`${count(parsed.length, "file")} read: ${count(model.hosts.size, "host")}, ${count(model.edges.size, "connection")}.${extra ? ` ${extra}` : ""}`,
     bad || notes.problems.length || found.truncated ? "warn" : "ok");
+  if (shouldAutoResolve(state.settings)) runDns({ auto: true });
 }
 
 // ---------- exports / sessions ----------
@@ -302,24 +345,29 @@ async function openSession(file) {
 }
 
 // ---------- DNS ----------
-async function runDns() {
-  if (dnsAbort) { dnsAbort.abort(); return; }
-  const { resolver, enabled } = state.settings.dns;
+const dnsRanges = () => [...state.settings.internalRanges, ...state.settings.subnets.map((x) => x.cidr)];
+const resolverLabel = () => RESOLVERS[state.settings.dns.resolver]?.label ?? "the resolver";
+const resolving = new Set(); // addresses with a single lookup in flight
+
+/** Look up every unresolved Internet host. auto: started by loading files (no questions asked). */
+async function runDns({ auto = false } = {}) {
+  if (dnsAbort) { if (!auto) dnsAbort.abort(); return; }
+  const { resolver, enabled, acknowledged } = state.settings.dns;
   if (!enabled || !resolver) { toast("Enable DNS lookup in Settings first.", "warn"); return; }
-  const sel = state.selected && state.model.hosts.get(state.selected);
-  if (sel && sel.internal) { toast("The selected host is internal: internal addresses are never sent to a resolver. Deselect it to resolve all Internet hosts.", "warn"); return; }
-  const hosts = sel ? [sel] : [...state.model.hosts.values()].filter((h) => !h.internal);
-  const ips = hosts.map((h) => h.ips[0]).filter((ip) => ip && !(ip in state.dns));
-  if (!ips.length) { toast("No unresolved Internet hosts."); return; }
+  const ips = [...state.model.hosts.values()].filter((h) => !h.internal).map((h) => h.ips[0]).filter((ip) => ip && !(ip in state.dns));
+  if (!ips.length) { if (!auto) toast("No unresolved Internet hosts."); return; }
+  if (!acknowledged && !(await confirmDialog(`Up to ${ips.length} public IP address${ips.length > 1 ? "es" : ""} will be sent to ${resolverLabel()} to look up their names. Internal addresses are never sent. (Tick the acknowledgement in Settings to stop this question.)`, "Send to resolver"))) return;
   dnsAbort = new AbortController();
   $("dns-label").textContent = "Cancel DNS";
   $("progress").hidden = false;
   const partial = new Map();
   try {
-    const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: dnsAbort.signal, internalRanges: [...state.settings.internalRanges, ...state.settings.subnets.map((s) => s.cidr)],
+    const res = await resolvePtrs(ips, { resolver, fetch: (u, o) => window.fetch(u, o), signal: dnsAbort.signal, internalRanges: dnsRanges(),
       onResult: (ip, name) => partial.set(ip, name),
-      onProgress: (d, t) => { $("progress-text").textContent = `${RESOLVERS[resolver].label} DNS ${d} / ${t}…`; } });
-    toast(`Resolved ${[...res.values()].filter(Boolean).length} of ${res.size} addresses via ${RESOLVERS[resolver].label}.`);
+      onProgress: (d, t) => { $("progress-text").textContent = `${resolverLabel()} DNS ${d} / ${t}…`; } });
+    const named = [...res.values()].filter(Boolean).length;
+    const notSent = ips.length - res.size;
+    toast(`DNS: ${named} of ${res.size} addresses have a name (via ${resolverLabel()}).${notSent ? ` ${notSent} not sent (documentation, reserved or internal ranges never have public names).` : ""}`);
   } catch (e) {
     toast(e.name === "AbortError" ? `DNS lookup cancelled; ${partial.size} addresses kept.` : `DNS lookup failed: ${e.message}`, "warn");
   } finally {
@@ -329,6 +377,29 @@ async function runDns() {
     $("progress").hidden = true;
     setDirty();
     refresh();
+  }
+}
+
+/** The details panel's "Resolve name" button: one Internet host, on its own. */
+async function resolveOne(host) {
+  const ip = host.ips[0];
+  const { disabled, warn } = resolveButton(state.settings);
+  if (disabled || !ip || resolving.has(ip)) return;
+  if (warn && !(await confirmDialog(`${ip} will be sent to ${resolverLabel()} to look up its name. (Tick the acknowledgement in Settings to stop this question.)`, "Send to resolver"))) return;
+  resolving.add(ip);
+  showDetails(state.selected);
+  try {
+    const res = await resolvePtrs([ip], { resolver: state.settings.dns.resolver, fetch: (u, o) => window.fetch(u, o), internalRanges: dnsRanges(), delayMs: 0 });
+    if (!res.has(ip)) { toast(`${ip} was not sent: it is in a range that never has a public name (documentation, reserved or internal).`, "warn"); return; }
+    state.dns[ip] = res.get(ip);
+    toast(res.get(ip) ? `${ip} is ${res.get(ip)}.` : `${ip} has no DNS name (no PTR record).`);
+    setDirty();
+    refresh();
+  } catch (e) {
+    toast(`DNS lookup failed: ${e.message}`, "warn");
+  } finally {
+    resolving.delete(ip);
+    if (state.selected) showDetails(state.selected);
   }
 }
 

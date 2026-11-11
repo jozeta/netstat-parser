@@ -30,8 +30,11 @@ requests unless you switch on the optional DNS lookup.
 - **Search and filter**, e.g. `port:445 subnet:"Office VLAN" risk:red`.
 - **Settings:** edit which protocols count as vulnerable, unencrypted or safe; name your subnets;
   edit the role rules.
-- **Optional DNS lookup** for Internet addresses via DNS-over-HTTPS (Cloudflare, Google or Quad9).
-  It's off by default, and the app warns you before sending anything.
+- **Optional DNS lookup** for Internet addresses via DNS-over-HTTPS (Cloudflare, Google or Quad9),
+  off by default. Once enabled in Settings: **Resolve DNS** looks up every Internet host, the
+  **Resolve name** button in an Internet host's details looks up just that one, and an optional
+  setting does it automatically after loading. Until you tick "I understand that public IP
+  addresses are sent", every lookup asks first. Internal and documentation addresses are never sent.
 - **Dark and light themes:** follows your system, or pick Dark or Light in the menu (top right).
 - **Exports:**
   - PNG
@@ -57,7 +60,8 @@ python3 -m http.server 8580      # then open http://localhost:8580/ (or: claude-
    `<hostname>_netstat.txt`.
 2. Open the app and drop the files on the graph, or a whole folder, or a `.zip` of them (or use
    **Load files** / **Load folder**). From folders and zips only likely netstat files are read
-   (`.txt`, `.log`, `.out`, no extension); the rest is skipped and counted.
+   (`.txt`, `.log`, `.out`, no extension); the rest is skipped and counted. Loading more files later
+   asks whether to add them to the current job or start a new one (the default is a setting).
 3. Click hosts, groups or lines for details; search with `port:445 risk:red`, `collected:no`,
    `seen:one` and so on; name your subnets and tune the protocol risk table in **Settings**.
 4. **Export → Session** saves the job to reopen later (nothing is saved automatically).

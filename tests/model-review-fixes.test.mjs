@@ -31,10 +31,10 @@ test("CSV quotes cells with ';' (Swedish Excel list separator)", () => {
 test("DNS never sends addresses inside configured internal ranges, multicast or reserved", async () => {
   const sent = [];
   const fetch = async (url) => { sent.push(url); return { ok: true, json: async () => ({ Status: 3 }) }; };
-  await resolvePtrs(["198.51.100.7", "203.0.113.10", "224.0.0.251", "240.0.0.1", "0.1.2.3", "ff02::fb"],
-    { resolver: "google", fetch, delayMs: 0, internalRanges: ["198.51.100.0/24"] });
+  await resolvePtrs(["93.184.217.7", "93.184.216.10", "224.0.0.251", "240.0.0.1", "0.1.2.3", "ff02::fb"],
+    { resolver: "google", fetch, delayMs: 0, internalRanges: ["93.184.217.0/24"] });
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /10\.113\.0\.203/);
+  assert.match(sent[0], /10\.216\.184\.93/);
 });
 
 test("ip: filter is exact unless it ends in '.', ':' or '*'", () => {

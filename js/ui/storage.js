@@ -7,7 +7,7 @@ export const SETTINGS_KEY = "netstat-parser.settings.v1";
 export function loadSettings(storage) {
   try {
     const raw = storage?.getItem(SETTINGS_KEY);
-    return validateSettings(raw ? JSON.parse(raw) : null);
+    return validateSettings(raw ? JSON.parse(raw) : null, { legacy: true });
   } catch {
     return validateSettings(null);
   }

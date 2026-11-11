@@ -63,7 +63,15 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
   dnsOn.checked = settings.dns.enabled;
   const resolver = select(settings.dns.resolver ?? "", [["", "Choose a resolver…"], ...Object.entries(RESOLVERS).map(([k, r]) => [k, r.label])], { id: "dns-resolver" });
   const ack = el("input", { type: "checkbox", id: "dns-ack" });
-  ack.checked = settings.dns.enabled;
+  ack.checked = settings.dns.acknowledged;
+  const auto = el("input", { type: "checkbox", class: "lg-toggle", id: "dns-auto" });
+  auto.checked = settings.dns.auto;
+  // automatic lookup only makes sense once lookups are on and the user accepted what is sent
+  const syncAuto = () => { auto.disabled = !(dnsOn.checked && ack.checked); if (auto.disabled) auto.checked = false; };
+  dnsOn.addEventListener("change", syncAuto);
+  ack.addEventListener("change", syncAuto);
+  syncAuto();
+  const onMore = select(settings.load.onMore, [["ask", "Ask every time"], ["merge", "Add them to the current job"], ["new", "Start a new job"]], { id: "load-on-more" });
 
   const tbody = (t) => t.querySelector("tbody");
 
@@ -93,9 +101,10 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
     if (okRanges.length !== ranges.length) { bad++; internal.classList.add("np-invalid"); }
     const t = Number(threshold.value);
     if (!(Number.isInteger(t) && t >= 0 && t <= 100000)) { bad++; threshold.classList.add("np-invalid"); }
-    if (dnsOn.checked && (!resolver.value || !ack.checked)) { bad++; resolver.classList.add("np-invalid"); }
+    if (dnsOn.checked && !resolver.value) { bad++; resolver.classList.add("np-invalid"); }
     return { bad, next: { protocols, subnets, internalRanges: okRanges, roleRules, graph: { expandUpTo: t, labels: labels.checked },
-      dns: { enabled: dnsOn.checked, resolver: resolver.value || null } } };
+      dns: { enabled: dnsOn.checked, resolver: resolver.value || null, acknowledged: ack.checked, auto: auto.checked },
+      load: { onMore: onMore.value } } };
   }
 
   const save = () => {
@@ -144,8 +153,15 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
       el("h2", { class: "lg-subtitle", id: "s-dns" }, "DNS lookup (optional)"),
       el("p", { class: "np-warning" }, "Reverse DNS for Internet addresses uses DNS-over-HTTPS. The public IP addresses you resolve are sent to the provider you choose. This is the only time the app talks to another server. Internal addresses are never sent."),
       el("label", { class: "np-inline", for: "dns-enabled" }, dnsOn, "Enable DNS lookup"),
+      el("span", { class: "lg-small lg-muted" }, "Turns on the Resolve DNS button (all Internet hosts) and the Resolve name button on each Internet host."),
       el("div", { class: "lg-field" }, el("label", { for: "dns-resolver" }, "Resolver"), resolver),
-      el("label", { class: "np-inline", for: "dns-ack" }, ack, "I understand that public IP addresses are sent to this provider.")),
+      el("label", { class: "np-inline", for: "dns-ack" }, ack, "I understand that public IP addresses are sent to this provider."),
+      el("span", { class: "lg-small lg-muted" }, "Until this is ticked, every lookup asks first."),
+      el("label", { class: "np-inline", for: "dns-auto" }, auto, "Look up Internet addresses automatically after loading files"),
+      el("span", { class: "lg-small lg-muted" }, "Needs DNS lookup enabled and the box above ticked.")),
+    el("section", { class: "lg-card lg-stack", "aria-labelledby": "s-load" },
+      el("h2", { class: "lg-subtitle", id: "s-load" }, "Loading more files"),
+      el("div", { class: "lg-field" }, el("label", { for: "load-on-more" }, "When files are loaded and a job already has files"), onMore)),
     el("div", { class: "lg-row np-settings-actions" },
       el("button", { class: "lg-btn lg-btn-primary", type: "button", onclick: save }, "Save settings"),
       el("button", { class: "lg-btn", type: "button", onclick: () => { onSave(validateSettings(DEFAULT_SETTINGS)); renderSettings(root, validateSettings(DEFAULT_SETTINGS), { onSave, toast, current }); toast("Settings reset to defaults."); } }, "Reset to defaults"),
