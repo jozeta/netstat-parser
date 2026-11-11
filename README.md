@@ -7,6 +7,10 @@ incident responders mapping a network they have been given access to.
 Everything runs locally in your browser. Files are never uploaded, and the app makes no network
 requests unless you switch on the optional DNS lookup.
 
+**Use it online: <https://jozeta.github.io/netstat-parser/>.** GitHub Pages only delivers the app's
+files; your netstat files are still read in your browser and never sent anywhere. To run it
+offline instead, see [Getting started](#getting-started).
+
 <table>
   <tr>
     <td width="33%"><img src="docs/screenshots/overview-dark.png" alt="The network map in the dark theme: subnet groups, the Internet cloud, risk-coloured connections and a selected domain controller's details"><br>Network map: subnets, the Internet cloud and risk-coloured connections; a selected host's details on the right.</td>

@@ -4,6 +4,9 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- The app is published on GitHub Pages: <https://jozeta.github.io/netstat-parser/> (link in the
+  README). It is the same static app; files are still only read in your browser.
+
 ## 0.2.0 (2026-11-11)
 
 First public release.
