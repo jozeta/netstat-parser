@@ -27,7 +27,14 @@ requests unless you switch on the optional DNS lookup.
 - **Hosts:** the node shape shows the role (client, server or both) and an icon shows the OS.
   Badges show listening ports, and tags mark well-known roles such as DC, DB, Web and RDP.
 - **Details panel** for any host, group, cloud or connection.
-- **Search and filter**, e.g. `port:445 subnet:"Office VLAN" risk:red`.
+- **Search and filter**, e.g. `port:445 subnet:"Office VLAN" risk:red` or `process:sshd` (files
+  with process names: Windows `netstat -anob`, Linux `ss -tunap`). Save any search as a named
+  chip next to the quick filters (the **+** beside the search box).
+- **Path finding:** in a host's details choose **Start a path here**, select another host and
+  choose **Find path**: the shortest chain of observed connections from one to the other, by
+  default only in the direction they were made, optionally only over red and orange connections.
+- **Neighbourhood view:** **Show → 1 hop / 2 hops around selection** draws only what is near the
+  selected host, group or line; click a neighbour to walk the network.
 - **Settings:** edit which protocols count as vulnerable, unencrypted or safe; name your subnets;
   edit the role rules.
 - **Optional DNS lookup** for Internet addresses via DNS-over-HTTPS (Cloudflare, Google or Quad9),
@@ -42,7 +49,7 @@ requests unless you switch on the optional DNS lookup.
 - **Exports:**
   - PNG
   - a saved session (`.json`) you can reopen later
-  - CSVs of connections and hosts
+  - CSVs of connections (with the process seen at each end) and hosts
   - a targets file listing uncollected hosts, for the collector
 - **"How to collect" page** with copy-ready commands per OS. Each command writes
   `<hostname>_netstat.txt` with a short header (hostname, IPs, OS, time).

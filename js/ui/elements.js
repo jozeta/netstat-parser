@@ -20,11 +20,14 @@ function badgeLine(h) {
 /**
  * @param {object} model
  * @param {{collapsed: Set<string>, visible: {hosts: Set<string>, edges: Set<string>}|null,
- *   mode: 'fade'|'hide', dns: Record<string, string|null>, labels: boolean}} opts
+ *   mode: 'fade'|'hide', dns: Record<string, string|null>, labels: boolean,
+ *   scope?: {hosts: Set<string>, edges: Set<string>}|null}} opts
+ *   scope: the neighbourhood view; anything outside it is not drawn at all (unlike visible/mode)
  * @returns {{nodes: object[], edges: object[]}}
  */
-export function toElements(model, { collapsed, visible, mode, dns, labels }) {
+export function toElements(model, { collapsed, visible, mode, dns, labels, scope = null }) {
   const hide = mode === "hide" && visible !== null;
+  const inScope = (id) => scope === null || scope.hosts.has(id);
   const hostOn = (id) => visible === null || visible.hosts.has(id);
   const edgeOn = (id) => visible === null || visible.edges.has(id);
   const nodes = [];
@@ -33,10 +36,12 @@ export function toElements(model, { collapsed, visible, mode, dns, labels }) {
   // groups
   for (const g of model.groups.values()) {
     const kind = g.kind === "internet" ? " internet" : "";
-    const anyOn = g.hostIds.some(hostOn);
+    const hostIds = g.hostIds.filter(inScope);
+    if (!hostIds.length) continue;
+    const anyOn = hostIds.some(hostOn);
     if (hide && !anyOn) continue;
     if (collapsed.has(g.id)) {
-      nodes.push({ data: { id: g.id, label: `${g.name}\n${g.hostIds.length} host${g.hostIds.length === 1 ? "" : "s"}`, count: g.hostIds.length, internal: 0, kind: g.kind, groupId: g.id },
+      nodes.push({ data: { id: g.id, label: `${g.name}\n${hostIds.length} host${hostIds.length === 1 ? "" : "s"}`, count: hostIds.length, internal: 0, kind: g.kind, groupId: g.id },
         classes: `collapsed group${kind}${anyOn ? "" : " faded"}` });
     } else {
       nodes.push({ data: { id: g.id, label: g.name, kind: g.kind, groupId: g.id }, classes: `group${kind}` });
@@ -46,7 +51,7 @@ export function toElements(model, { collapsed, visible, mode, dns, labels }) {
 
   // hosts
   for (const h of model.hosts.values()) {
-    if (collapsed.has(h.groupId)) continue;
+    if (collapsed.has(h.groupId) || !inScope(h.id)) continue;
     const on = hostOn(h.id);
     if (hide && !on) continue;
     const ip = h.ips[0] ?? "";
@@ -69,6 +74,7 @@ export function toElements(model, { collapsed, visible, mode, dns, labels }) {
   const merged = new Map();
   const edges = [];
   for (const e of model.edges.values()) {
+    if (scope !== null && !scope.edges.has(e.id)) continue;
     const on = edgeOn(e.id);
     if (hide && !on) continue;
     const s = endpoint(e.source), t = endpoint(e.target);

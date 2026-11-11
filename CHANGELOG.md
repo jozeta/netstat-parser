@@ -4,6 +4,14 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+- Search: `process:` (e.g. `process:sshd`), and plain words also match process names. The
+  connections CSV has `source_process` and `destination_process` columns.
+- Saved filters: save the current search under a name (**+** next to the search box); it appears
+  as a chip beside the quick filters. Stored with your settings.
+- Path finding: **Start a path here** on one host, **Find path** on another; the path is
+  highlighted and listed hop by hop. Options: only red/orange connections, ignore direction.
+- Neighbourhood view: **Show → 1 hop / 2 hops around selection** draws only what is near the
+  selection.
 - Subnet groups and the Internet cloud look like frosted glass: a translucent tint with a light
   sheen from the top, a fine grain, a bright rim and a soft shadow, tuned for dark and light.
 - The current job survives a reload or a closed tab: it is kept in this browser (IndexedDB) until

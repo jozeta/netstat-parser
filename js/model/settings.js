@@ -45,7 +45,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // when files are loaded into a job that already has files: ask, merge or start a new job.
   // keepJob: keep the current job in this browser (IndexedDB) so a reload does not lose it
   load: { onMore: "ask", keepJob: true },
+  // named searches shown as chips next to the quick filters (a preference of this user)
+  savedFilters: [],
 });
+export const SAVED_FILTERS_MAX = 50, SAVED_NAME_MAX = 40, SAVED_QUERY_MAX = 1000;
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const isPort = (n) => Number.isInteger(n) && n >= 1 && n <= 65535;
@@ -108,6 +111,19 @@ export function validateSettings(input, { legacy = false } = {}) {
     }).filter(Boolean);
     out.roleRules = input.roleRules.length === 0 || rules.length ? rules : d.roleRules;
   }
+  if (Array.isArray(input.savedFilters)) {
+    const seen = new Set();
+    out.savedFilters = [];
+    for (const f of input.savedFilters) {
+      if (out.savedFilters.length >= SAVED_FILTERS_MAX) break;
+      if (!f || typeof f.name !== "string" || typeof f.query !== "string") continue;
+      const name = cleanText(f.name, 1000), query = cleanText(f.query, 2000);
+      // too long is refused rather than cut: a cut query would search for something else
+      if (!name || !query || name.length > SAVED_NAME_MAX || query.length > SAVED_QUERY_MAX || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      out.savedFilters.push({ name, query });
+    }
+  }
   if (input.graph && typeof input.graph === "object") {
     const t = input.graph.expandUpTo;
     if (Number.isInteger(t) && t >= 0 && t <= 100000) out.graph.expandUpTo = t;
@@ -154,6 +170,7 @@ export function mergeSessionSettings(current, fromSession) {
   const merged = clone(fromSession);
   merged.dns = clone(current.dns);
   merged.load = clone(current.load); // a preference of this user, not of the job
+  merged.savedFilters = clone(current.savedFilters);
   merged.internalRanges = [...new Set([...current.internalRanges, ...fromSession.internalRanges])];
   return validateSettings(merged);
 }

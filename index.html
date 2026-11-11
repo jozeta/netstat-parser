@@ -57,6 +57,7 @@
           <div class="np-search">
             <label class="np-visually-hidden" for="search">Search and filter</label>
             <input id="search" class="lg-input" type="search" placeholder="Search: port:445 risk:red subnet:&quot;Servers&quot; -os:linux" autocomplete="off" spellcheck="false">
+            <button class="lg-btn lg-btn-ghost lg-btn-icon" id="save-filter-btn" type="button" title="Save this search as a filter chip"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#plus"/></svg><span class="np-visually-hidden">Save this search</span></button>
             <button class="lg-btn lg-btn-ghost lg-btn-icon" id="filter-help-btn" type="button" aria-expanded="false" aria-controls="filter-help" title="Filter help"><svg class="lg-icon" aria-hidden="true"><use href="vendor/lada-glass/1.1.1/icons/sprite.svg#info"/></svg><span class="np-visually-hidden">Filter help</span></button>
           </div>
           <div class="np-chips" aria-label="Quick filters">
@@ -64,8 +65,15 @@
             <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="risk:orange" aria-pressed="false"><span class="np-dot np-risk-exploitable" aria-hidden="true"></span>Exploitable</button>
             <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="seen:one" aria-pressed="false"><span class="np-dot np-dot-dashed" aria-hidden="true"></span>One end only</button>
             <button class="lg-btn lg-btn-ghost np-quick" type="button" data-q="collected:no" aria-pressed="false"><span class="np-dot np-host-seen" aria-hidden="true"></span>Not collected</button>
+            <span class="np-saved" id="saved-filters" role="group" aria-label="Saved filters"></span>
           </div>
           <label class="np-inline"><input id="hide-toggle" class="lg-toggle" type="checkbox"> Hide non-matching</label>
+          <label class="np-inline" for="hops">Show
+            <select id="hops" class="lg-input np-hops" title="Only draw what is near the selected host, group or connection">
+              <option value="0">everything</option>
+              <option value="1">1 hop around selection</option>
+              <option value="2">2 hops around selection</option>
+            </select></label>
           <div class="np-actions">
             <button class="lg-btn" id="fit-btn" type="button">Fit</button>
             <button class="lg-btn" id="collapse-btn" type="button">Collapse all</button>
@@ -103,6 +111,7 @@
               <tr><th scope="row"><code class="lg-code">tag:</code></th><td>DC, DB, Web, RDP…</td></tr>
               <tr><th scope="row"><code class="lg-code">collected:</code></th><td>yes or no</td></tr>
               <tr><th scope="row"><code class="lg-code">seen:</code></th><td>both or one (ends)</td></tr>
+              <tr><th scope="row"><code class="lg-code">process:</code></th><td>process name contains, <code class="lg-code">process:sshd</code> (files with process names: <code class="lg-code">-anob</code>, <code class="lg-code">ss -p</code>)</td></tr>
             </tbody>
           </table>
         </div>
@@ -164,6 +173,10 @@
     <div class="lg-popup np-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
       <strong id="dialog-title">Confirm</strong>
       <p id="dialog-text" class="lg-muted"></p>
+      <div class="lg-field" id="dialog-field" hidden>
+        <label for="dialog-input" id="dialog-input-label">Name</label>
+        <input class="lg-input" id="dialog-input" type="text" autocomplete="off" spellcheck="false">
+      </div>
       <div class="lg-row np-dialog-actions">
         <button class="lg-btn" id="dialog-cancel" type="button">Cancel</button>
         <button class="lg-btn" id="dialog-alt" type="button" hidden>Other</button>

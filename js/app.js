@@ -5,7 +5,8 @@ import { buildModel } from "./model/build.js";
 import { parseQuery, applyFilter } from "./model/filter.js";
 import { connectionsCsv, hostsCsv, targetsFile } from "./model/exports.js";
 import { createSession, parseSession } from "./model/session.js";
-import { mergeSessionSettings } from "./model/settings.js";
+import { mergeSessionSettings, validateSettings, SAVED_FILTERS_MAX, SAVED_NAME_MAX } from "./model/settings.js";
+import { findPath, neighbourhood } from "./model/paths.js";
 import { resolveButton, shouldAutoResolve, loadChoice } from "./model/policy.js";
 import { MAX_FILE_BYTES, MAX_ARCHIVE_BYTES } from "./worker-core.js";
 import { isCandidate } from "./lib/inputs.js";
@@ -40,6 +41,9 @@ const state = {
   hide: false,
   model: null,
   visible: null,
+  hops: 0, // 0 = draw everything; 1 or 2 = only the selection's neighbourhood
+  pathStart: null, // host id chosen with "Start a path here"
+  path: null, // {from, to, hosts, edges, riskyOnly, directed} when a path is shown
 };
 let graph = null;
 let dnsAbort = null;
@@ -54,11 +58,12 @@ function toast(text, kind = "ok", ms = 6000) {
 
 let dialogOpen = false;
 /**
- * Modal question. Returns "ok", "alt" (the optional middle choice) or null (cancelled).
+ * Modal question. Returns "ok", "alt" (the optional middle choice) or null (cancelled). With
+ * `input`, it asks for a line of text instead and returns that text, or null when cancelled.
  * @param {string} text
- * @param {{ok?: string, alt?: string, title?: string}} [labels]
+ * @param {{ok?: string, alt?: string, title?: string, input?: {label: string, value?: string, max?: number}}} [labels]
  */
-function askDialog(text, { ok: okLabel = "Continue", alt: altLabel = null, title = "Confirm" } = {}) {
+function askDialog(text, { ok: okLabel = "Continue", alt: altLabel = null, title = "Confirm", input = null } = {}) {
   if (dialogOpen) return Promise.resolve(null); // one question at a time
   dialogOpen = true;
   return new Promise((resolve) => {
@@ -69,10 +74,14 @@ function askDialog(text, { ok: okLabel = "Continue", alt: altLabel = null, title
     ok.textContent = okLabel;
     alt.hidden = !altLabel;
     alt.textContent = altLabel ?? "";
+    const field = $("dialog-field"), inp = $("dialog-input");
+    field.hidden = !input;
+    if (input) { $("dialog-input-label").textContent = input.label; inp.value = input.value ?? ""; inp.maxLength = input.max ?? 200; }
     d.hidden = false;
-    ok.focus();
-    const buttons = () => [cancel, alt, ok].filter((b) => !b.hidden);
-    const done = (v) => {
+    if (input) { inp.focus(); inp.select(); } else ok.focus();
+    const buttons = () => [input ? inp : null, cancel, alt, ok].filter((b) => b && !b.hidden);
+    const done = (choice) => {
+      const v = input ? (choice === "ok" ? inp.value : null) : choice;
       d.hidden = true;
       ok.onclick = alt.onclick = cancel.onclick = null;
       document.removeEventListener("keydown", keys, true);
@@ -83,6 +92,7 @@ function askDialog(text, { ok: okLabel = "Continue", alt: altLabel = null, title
     // modal: Escape cancels, Tab cycles between the dialog's buttons only
     const keys = (ev) => {
       if (ev.key === "Escape") { ev.preventDefault(); done(null); }
+      if (ev.key === "Enter" && input && document.activeElement === inp) { ev.preventDefault(); done("ok"); }
       if (ev.key === "Tab") {
         ev.preventDefault();
         const list = buttons(), i = list.indexOf(document.activeElement);
@@ -171,6 +181,8 @@ function rebuild({ relayout = false, adopt = false } = {}) {
     if (collapse.has(id)) state.collapsed.add(id); else state.collapsed.delete(id);
   }
   if (sel && !sel.startsWith("a:") && !m.hosts.has(sel) && !m.groups.has(sel) && !m.edges.has(sel)) state.selected = null;
+  if (state.pathStart && !m.hosts.has(state.pathStart)) state.pathStart = null;
+  if (state.path && !state.path.edges.every((id) => m.edges.has(id))) { state.path = null; graph.showPath(null); }
   refresh({ relayout });
   renderFiles();
   const hosts = state.model.hosts.size, edges = state.model.edges.size;
@@ -182,10 +194,73 @@ function refresh({ relayout = false, fit = false } = {}) {
   graph.resize();
   const terms = parseQuery(state.query);
   state.visible = terms.length ? applyFilter(state.model, terms) : null;
-  const els = toElements(state.model, { collapsed: state.collapsed, visible: state.visible, mode: state.hide ? "hide" : "fade", dns: state.dns, labels: state.settings.graph.labels });
+  const scope = scopeFor(state.selected);
+  $("hops").classList.toggle("np-hops-idle", state.hops > 0 && !scope);
+  const els = toElements(state.model, { collapsed: state.collapsed, visible: state.visible, mode: state.hide ? "hide" : "fade", dns: state.dns,
+    labels: state.settings.graph.labels, scope });
   graph.render(els, state.positions, { relayout, fit: relayout || fit });
   renderHosts();
   if (state.selected) { graph.select(state.selected, { center: false }); showDetails(state.selected); }
+}
+
+/** The hosts a selection stands for (a host, a group's hosts, a connection's two ends). */
+function hostsOf(id) {
+  const m = state.model;
+  if (!id || !m) return [];
+  if (m.hosts.has(id)) return [id];
+  if (m.groups.has(id)) return m.groups.get(id).hostIds;
+  if (m.edges.has(id)) { const e = m.edges.get(id); return [e.source, e.target]; }
+  if (id.startsWith("a:")) return id.slice(2).split("|").flatMap(hostsOf); // a merged line between collapsed groups
+  return [];
+}
+/** Neighbourhood view: only what is within state.hops of the selection (null = draw everything). */
+function scopeFor(id) {
+  if (!state.hops) return null;
+  const ids = hostsOf(id);
+  return ids.length ? neighbourhood(state.model, ids, state.hops) : null;
+}
+
+// ---------- paths ----------
+function findPathTo(to, { riskyOnly, directed }) {
+  const from = state.pathStart, m = state.model;
+  if (!from || !m.hosts.has(from) || !m.hosts.has(to)) return;
+  const p = findPath(m, from, to, { riskyOnly, directed });
+  const a = m.hosts.get(from).label, b = m.hosts.get(to).label;
+  if (!p) {
+    toast(`No path from ${a} to ${b}${riskyOnly ? " over red or orange connections" : ""}${directed ? " in the direction the connections were made" : ""}.`, "warn");
+    return;
+  }
+  state.path = { from, to, ...p, riskyOnly, directed };
+  // every host on the path must be drawn: expand its group, leave the neighbourhood view
+  for (const id of p.hosts) state.collapsed.delete(m.hosts.get(id).groupId);
+  if (state.hops) { state.hops = 0; $("hops").value = "0"; }
+  refresh();
+  const missing = graph.showPath(p);
+  toast(`Path from ${a} to ${b}: ${count(p.edges.length, "hop")}.${missing ? " Part of it is hidden by the search (Hide non-matching)." : ""}`);
+}
+function clearPath() {
+  state.path = null;
+  graph.showPath(null);
+  if (state.selected) showDetails(state.selected);
+}
+function pathProps(h) {
+  const m = state.model, start = state.pathStart && m.hosts.get(state.pathStart);
+  const result = state.path && state.path.to === h.id ? state.path : null;
+  return {
+    startLabel: start ? start.label : null,
+    isStart: state.pathStart === h.id,
+    onStart: () => { state.pathStart = h.id; showDetails(h.id); toast(`Path start: ${h.label}. Now select another host and choose "Find path".`); },
+    onCancel: () => { state.pathStart = null; clearPath(); showDetails(h.id); },
+    onFind: (opts) => findPathTo(h.id, opts),
+    onClear: clearPath,
+    result: result && {
+      ...result,
+      steps: result.edges.map((eid, i) => {
+        const e = m.edges.get(eid), from = result.hosts[i];
+        return { edge: e, from: m.hosts.get(from).label, to: m.hosts.get(result.hosts[i + 1]).label, forward: e.source === from };
+      }),
+    },
+  };
 }
 
 function pick(id) {
@@ -206,7 +281,7 @@ function showDetails(id) {
     const host = m.hosts.get(id);
     const b = resolveButton(state.settings);
     const resolve = host.internal ? null : { disabled: b.disabled, busy: resolving.has(host.ips[0]), onClick: () => resolveOne(host) };
-    replace(pane, hostDetails({ model: m, host, dns: state.dns, onPick: pick, resolve }));
+    replace(pane, hostDetails({ model: m, host, dns: state.dns, onPick: pick, resolve, path: pathProps(host) }));
   }
   else if (m.groups.has(id)) replace(pane, groupDetails({ model: m, group: m.groups.get(id), collapsed: state.collapsed.has(id), onToggle: toggleGroup, onPick: pick }));
   else if (m.edges.has(id)) replace(pane, edgeDetails({ model: m, edge: m.edges.get(id), onPick: pick }));
@@ -298,7 +373,8 @@ function parseInWorker(fileList) {
 function resetJob() {
   generation++;
   dnsAbort?.abort();
-  Object.assign(state, { files: [], positions: {}, collapsed: new Set(), known: new Set(), dns: {}, selected: null });
+  Object.assign(state, { files: [], positions: {}, collapsed: new Set(), known: new Set(), dns: {}, selected: null, pathStart: null, path: null });
+  graph.showPath(null);
   setDirty(false);
 }
 
@@ -444,7 +520,11 @@ async function resolveOne(host) {
 // ---------- wiring ----------
 function init() {
   graph = createGraph($("graph"), {
-    onSelect: (id) => { state.selected = id; showDetails(id); if (id) selectTab("details"); },
+    onSelect: (id) => {
+      state.selected = id;
+      if (state.hops) refresh({ fit: true }); else showDetails(id);
+      if (id) selectTab("details");
+    },
     onToggleGroup: toggleGroup,
     // only positions the user chose are kept; everything else follows the grouped layout
     onMoved: (id, pos) => { state.positions[id] = pos; setDirty(); },
@@ -490,6 +570,13 @@ function init() {
     });
   }
   $("hide-toggle").addEventListener("change", (ev) => { state.hide = ev.target.checked; if (state.model) refresh(); });
+  $("hops").addEventListener("change", (ev) => {
+    state.hops = Number(ev.target.value) || 0;
+    if (state.hops && !hostsOf(state.selected).length) toast("Select a host, group or connection to see what is around it.");
+    if (state.model) refresh({ fit: true });
+  });
+  $("save-filter-btn").addEventListener("click", saveFilter);
+  renderSaved();
   $("filter-help-btn").addEventListener("click", () => {
     const h = $("filter-help");
     h.hidden = !h.hidden;
@@ -574,6 +661,39 @@ function initTheme() {
 function syncQuick() {
   const terms = state.query.split(/\s+/);
   for (const b of document.querySelectorAll(".np-quick")) b.setAttribute("aria-pressed", String(terms.includes(b.dataset.q)));
+  for (const b of document.querySelectorAll(".np-saved-btn")) b.setAttribute("aria-pressed", String(state.query.trim() === b.dataset.q));
+}
+
+// ---------- saved filters (a setting: they belong to the user, not to the job) ----------
+function setQuery(q) {
+  state.query = q;
+  $("search").value = q;
+  syncQuick();
+  if (state.model) refresh();
+}
+function renderSaved() {
+  replace($("saved-filters"), state.settings.savedFilters.map((f) => el("span", { class: "np-saved-chip" },
+    el("button", { class: "lg-btn lg-btn-ghost np-saved-btn", type: "button", title: f.query, "data-q": f.query,
+      "aria-pressed": String(state.query.trim() === f.query), onclick: () => setQuery(state.query.trim() === f.query ? "" : f.query) }, f.name),
+    el("button", { class: "lg-btn lg-btn-ghost np-saved-x", type: "button", title: `Remove "${f.name}"`, "aria-label": `Remove saved filter ${f.name}`,
+      onclick: () => storeSaved(state.settings.savedFilters.filter((g) => g !== f)) }, "×"))));
+}
+function storeSaved(list) {
+  state.settings = validateSettings({ ...state.settings, savedFilters: list });
+  if (!saveSettings(storage, state.settings)) toast("Saved filters could not be stored in this browser (private mode?). They apply until you reload.", "warn");
+  renderSaved();
+}
+async function saveFilter() {
+  const q = state.query.trim();
+  if (!q) { toast("Type a search first, then save it.", "warn"); $("search").focus(); return; }
+  const name = (await askDialog(`Save the search "${q}" as a chip next to the quick filters.`,
+    { title: "Save filter", ok: "Save", input: { label: "Name", value: q.slice(0, SAVED_NAME_MAX), max: SAVED_NAME_MAX } }))?.trim();
+  if (!name) return;
+  const others = state.settings.savedFilters.filter((f) => f.name.toLowerCase() !== name.toLowerCase());
+  if (others.length >= SAVED_FILTERS_MAX) { toast(`At most ${SAVED_FILTERS_MAX} saved filters; remove one first.`, "warn"); return; }
+  const replaced = others.length < state.settings.savedFilters.length;
+  storeSaved([...others, { name, query: q }]);
+  toast(replaced ? `Saved filter "${name}" updated.` : `Saved filter "${name}" added.`);
 }
 
 init();

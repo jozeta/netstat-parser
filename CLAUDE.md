@@ -52,7 +52,7 @@ npm run gen:data    # write synthetic datasets to tests/data/generated/{small,me
 - `js/ui/dropped.js`: walks dropped folders; `js/ui/collapse.js`: default expand/collapse (Settings
   `graph.expandUpTo`, default 30, applied to groups seen for the first time)
 - `js/model/`: `build.js` (`buildModel(files, settings)` → hosts/groups/edges), `settings.js`
-  (defaults, `validateSettings`, `classify`), `filter.js` (`parseQuery`, `applyFilter`), `exports.js`
+  (defaults, `validateSettings`, `classify`), `filter.js` (`parseQuery`, `applyFilter`), `paths.js` (`findPath`, `neighbourhood`), `exports.js`
   (CSV, targets), `session.js` (save/open, untrusted import), `dns.js` (DoH PTR, injected fetch)
 - `scripts/gen/`: seeded network generator (`topology.js`) and renderer (`render.js`);
   `scripts/generate-datasets.js` is the CLI

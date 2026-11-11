@@ -19,11 +19,15 @@ const firstIp = (h) => h.ips[0] ?? "";
 
 /** @param {object} model */
 export function connectionsCsv(model) {
-  const lines = [row(["source_host", "source_ip", "destination_host", "destination_ip", "port", "proto", "protocol", "risk", "states", "seen", "source_files"])];
+  const lines = [row(["source_host", "source_ip", "destination_host", "destination_ip", "port", "proto", "protocol", "risk", "states", "seen", "source_files",
+    "source_process", "destination_process"])];
+  // the process names each end's own file shows (a file without process names leaves it empty)
+  const procs = (e, hostId) => [...new Set(e.observations.filter((o) => o.hostId === hostId && o.process).map((o) => o.process))].sort().join(" ");
   for (const e of model.edges.values()) {
     const s = model.hosts.get(e.source), t = model.hosts.get(e.target);
     const files = [...new Set(e.observations.map((o) => o.fileName))].join(" ");
-    lines.push(row([s.label, firstIp(s), t.label, firstIp(t), e.port, e.proto, e.name, e.risk, e.states.join(" "), e.seen, files]));
+    lines.push(row([s.label, firstIp(s), t.label, firstIp(t), e.port, e.proto, e.name, e.risk, e.states.join(" "), e.seen, files,
+      procs(e, e.source), procs(e, e.target)]));
   }
   return lines.join("\n") + "\n";
 }

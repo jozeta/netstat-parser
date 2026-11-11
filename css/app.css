@@ -126,6 +126,15 @@
 /* quick filters are toggles: a dot in the legend colour, filled when pressed */
 .np-quick { gap: var(--lg-space-xxs); border: 1px solid var(--lg-line); border-radius: 999px; color: var(--lg-text); }
 .np-quick[aria-pressed="true"] { background: var(--lg-accent); border-color: var(--lg-accent); color: var(--lg-on-accent, #fff); }
+.np-saved { display: contents; }
+.np-saved-chip { display: inline-flex; align-items: center; border: 1px solid var(--lg-line); border-radius: 999px; }
+.np-saved-btn { border-radius: 999px 0 0 999px; color: var(--lg-text); max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-saved-btn[aria-pressed="true"] { background: var(--lg-accent); color: var(--lg-on-accent, #fff); }
+.np-saved-x { border-radius: 0 999px 999px 0; padding-inline: .5em; color: var(--lg-muted); }
+.np-hops { width: auto; }
+.np-hops-idle { border-color: var(--np-risk-exploitable); }
+.np-path { display: grid; gap: var(--lg-space-xxs); }
+.np-path-steps { padding-left: 1.4em; }
 .np-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 0; background: currentColor; flex: none; }
 .np-dot.np-risk-vulnerable { background: var(--np-risk-vulnerable); }
 .np-dot.np-risk-exploitable { background: var(--np-risk-exploitable); }

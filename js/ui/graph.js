@@ -83,6 +83,9 @@ function stylesheet(large = false) {
     { selector: "edge.dim", style: { opacity: 0.05 } },
     { selector: "edge.focus", style: { opacity: 1, width: 2.4, "z-index": 10 } },
     { selector: "edge.faded", style: { opacity: 0.06 } },
+    // a found path: drawn on top, everything else steps back
+    { selector: "edge.on-path", style: { width: 4.5, "line-color": select, "target-arrow-color": select, "arrow-scale": 1, opacity: 1, "z-index": 30 } },
+    { selector: "node.host.on-path", style: { "border-color": select, "border-width": 3.5, opacity: 1 } },
     { selector: ":selected", style: { "overlay-color": select, "overlay-opacity": 0.25, "overlay-padding": 4 } },
     { selector: "node.host:selected", style: { "border-color": select, "border-width": 3 } },
   ];
@@ -103,9 +106,28 @@ export function createGraph(container, handlers) {
   });
   cy.on("dbltap", "node.group", (ev) => handlers.onToggleGroup(ev.target.id()));
   // focus the selection: its own connections and neighbours stay, the rest steps back
-  const unfocus = () => cy.elements().removeClass("dim focus");
+  let path = null; // {hosts, edges} while a path is shown; it wins over the selection focus
+  const unfocus = () => { cy.elements().removeClass("dim focus"); if (path) applyPath(); };
+  /** @returns {number} how many path elements are not drawn (hidden by a filter) */
+  const applyPath = () => {
+    cy.elements().removeClass("on-path");
+    if (!path) return 0;
+    let on = cy.collection(), missing = 0;
+    for (const id of [...path.hosts, ...path.edges]) {
+      const e = cy.getElementById(id);
+      if (e.empty()) missing++; else on = on.union(e);
+    }
+    const keep = on.union(on.nodes().ancestors());
+    cy.batch(() => {
+      cy.elements().removeClass("dim focus");
+      cy.elements().not(keep).addClass("dim");
+      on.addClass("on-path");
+    });
+    return missing;
+  };
   const focus = (ele) => {
-    unfocus();
+    if (path) { applyPath(); return; }
+    cy.elements().removeClass("dim focus");
     let keep;
     if (ele.isEdge()) keep = ele.union(ele.connectedNodes());
     else if (ele.isParent()) keep = ele.union(ele.descendants()).union(ele.descendants().connectedEdges()).union(ele.descendants().neighborhood());
@@ -153,7 +175,17 @@ export function createGraph(container, handlers) {
       // only rebuild the stylesheet when the size class changes (appending rules every render leaks)
       if (isLarge !== large) { large = isLarge; restyle(); }
       if (fit || relayout || !hadNodes) { cy.fit(undefined, 30); userMoved = false; }
+      applyPath();
       return Promise.resolve();
+    },
+    /** Show a path ({hosts, edges} ids) or clear it (null). Returns how many of its elements are not drawn. */
+    showPath(p) {
+      path = p ? { hosts: [...p.hosts], edges: [...p.edges] } : null;
+      if (!path) { cy.elements().removeClass("on-path dim focus"); const sel = cy.$(":selected"); if (sel.nonempty()) focus(sel[0]); return 0; }
+      const missing = applyPath();
+      const on = cy.elements(".on-path");
+      if (on.nonempty()) cy.animate({ fit: { eles: on, padding: 60 } }, { duration: reducedMotion() ? 0 : 300 });
+      return missing;
     },
     positions() {
       const out = {};

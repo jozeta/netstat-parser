@@ -213,8 +213,25 @@ added to it.
   file(s)).
 - **Search & filter**: free text plus field terms, combinable, e.g.
   `port:445 subnet:"Office VLAN" risk:red`. Fields: ip, host, port, proto/protocol name, risk, os,
-  subnet, state, role, tag, collected (yes/no), seen (both/one). Non-matching elements fade
-  (default) or are hidden (toggle). Exact syntax is the builder's call; it needs a short help popup.
+  subnet, state, role, tag, collected (yes/no), seen (both/one), process (name contains; a
+  process belongs to the host whose file shows it, never to the peer). Free text also matches
+  process names. Non-matching elements fade (default) or are hidden (toggle). Exact syntax is the
+  builder's call; it needs a short help popup.
+- **Saved filters** (owner request 2026-11-11): the current search can be saved under a name and
+  appears as a chip next to the quick filters; clicking it applies or clears it. Up to 50, name
+  up to 40 characters, query up to 1000. Stored with the settings (a preference of the user, so a
+  session never replaces them, and "Reset to defaults" keeps them).
+- **Path finding** (owner request 2026-11-11): in a host's details, "Start a path here", then on
+  another host "Find path". Shortest path in hops over the observed connections, by default only
+  in the direction they were made (client → server: if A connected to B, A can reach B); options:
+  only red/orange connections, ignore direction. The path is highlighted on the graph (it wins
+  over the selection focus until cleared) and listed hop by hop with port and risk. Groups on the
+  path are expanded and the neighbourhood view is switched off so the whole path is drawn.
+- **Neighbourhood view** (owner request 2026-11-11): toolbar "Show: everything / 1 hop / 2 hops
+  around selection". Only hosts within N connections (either direction) of the selected host,
+  group or connection, and the connections among them, are drawn; the rest is not drawn at all
+  and the layout repacks. Clicking a neighbour walks the network; clicking the background shows
+  everything again. Combines with search.
 - Keyboard: everything reachable without a mouse (tab through toolbar, arrow/Enter in lists of
   hosts/edges as an accessible alternative to the canvas).
 - Unsaved-work warning when leaving the page with a loaded job that has not been exported as a
@@ -269,7 +286,8 @@ Stored in `localStorage` (settings only; the job itself is kept separately, see 
   the schema and treats the file as untrusted.
 - **PNG**: current view or full graph.
 - **CSV**: `connections.csv` (source host/IP, destination host/IP, port, proto, protocol name,
-  risk, states, both/one end, source files) and `hosts.csv` (hostname, IPs, OS, role, tags,
+  risk, states, both/one end, source files, the process names seen at the source and at the
+  destination end) and `hosts.csv` (hostname, IPs, OS, role, tags,
   subnet, collected yes/no, listening ports). Cells are escaped against CSV/formula injection.
 - **Targets export**: seen-only **internal** hosts as a collector targets file template.
 

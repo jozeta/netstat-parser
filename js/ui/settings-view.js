@@ -106,7 +106,7 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
     if (dnsOn.checked && !resolver.value) { bad++; resolver.classList.add("np-invalid"); }
     return { bad, next: { protocols, subnets, internalRanges: okRanges, roleRules, graph: { expandUpTo: t, labels: labels.checked },
       dns: { enabled: dnsOn.checked, resolver: resolver.value || null, acknowledged: ack.checked, auto: auto.checked },
-      load: { onMore: onMore.value, keepJob: keepJob.checked } } };
+      load: { onMore: onMore.value, keepJob: keepJob.checked }, savedFilters: current().savedFilters } };
   }
 
   const save = () => {
@@ -168,7 +168,10 @@ export function renderSettings(root, settings, { onSave, toast, current = () => 
       el("span", { class: "lg-small lg-muted" }, "A reload or a closed tab does not lose the job. It is stored on this computer, in this browser only, until you start a new job or turn this off (turning it off deletes it). Nothing is uploaded.")),
     el("div", { class: "lg-row np-settings-actions" },
       el("button", { class: "lg-btn lg-btn-primary", type: "button", onclick: save }, "Save settings"),
-      el("button", { class: "lg-btn", type: "button", onclick: () => { onSave(validateSettings(DEFAULT_SETTINGS)); renderSettings(root, validateSettings(DEFAULT_SETTINGS), { onSave, toast, current }); toast("Settings reset to defaults."); } }, "Reset to defaults"),
+      el("button", { class: "lg-btn", type: "button", onclick: () => {
+        // saved filters are the user's own searches, not a setting with a default: keep them
+        const reset = validateSettings({ ...DEFAULT_SETTINGS, savedFilters: current().savedFilters });
+        onSave(reset); renderSettings(root, reset, { onSave, toast, current }); toast("Settings reset to defaults (saved filters kept)."); } }, "Reset to defaults"),
       el("button", { class: "lg-btn", type: "button", onclick: () => download("netstat-parser-settings.json", JSON.stringify(current(), null, 2), "application/json") }, "Export settings"),
       el("label", { class: "lg-btn", for: "settings-import" }, "Import settings"), importInput));
 }

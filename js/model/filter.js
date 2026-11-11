@@ -1,8 +1,8 @@
-// Search and filter: "port:445 subnet:\"Office VLAN\" risk:red -os:linux dc01".
+// Search and filter: "port:445 subnet:\"Office VLAN\" risk:red -os:linux process:sshd dc01".
 // Hosts match on their own attributes and their incident edges; edges match on their own
 // attributes and either endpoint's host attributes. Bad input never throws; it matches nothing.
 
-const FIELDS = new Set(["ip", "host", "port", "proto", "risk", "os", "subnet", "state", "role", "tag", "collected", "seen"]);
+const FIELDS = new Set(["ip", "host", "port", "proto", "risk", "os", "subnet", "state", "role", "tag", "collected", "seen", "process"]);
 const RISK_ALIASES = {
   red: "vulnerable", vulnerable: "vulnerable", orange: "exploitable", yellow: "exploitable", exploitable: "exploitable",
   unencrypted: "exploitable", safe: "safe", green: "safe", none: "unclassified", unclassified: "unclassified", unknown: "unclassified",
@@ -59,6 +59,7 @@ function edgeAttr(e, field, v) {
     case "risk": return RISK_ALIASES[v] !== undefined && e.risk === RISK_ALIASES[v];
     case "state": return e.states.some((s) => lc(s) === v.replace(/-/g, "_"));
     case "seen": return e.seen === v;
+    case "process": return e.observations.some((o) => has(o.process, v));
     default: return undefined;
   }
 }
@@ -69,6 +70,7 @@ function listenAttr(l, field, v) {
     case "proto": return l.proto === v || lc(l.name) === v;
     case "risk": return RISK_ALIASES[v] !== undefined && l.risk === RISK_ALIASES[v];
     case "state": return v === "listen" || v === "bound";
+    case "process": return has(l.process, v);
     default: return false;
   }
 }
@@ -89,8 +91,13 @@ export function applyFilter(model, terms) {
   }
   const norm = terms.map((t) => ({ ...t, value: lc(t.value).trim() }));
 
+  // a process belongs to the host whose file shows it, never to the peer at the other end
+  const runs = (h, v) => h.listening.some((l) => has(l.process, v))
+    || (incident.get(h.id) ?? []).some((e) => e.observations.some((o) => o.hostId === h.id && has(o.process, v)));
   const hostMatches = (h, t) => {
     if (!t.value) return false;
+    if (t.field === "process") return runs(h, t.value);
+    if (t.field === null && runs(h, t.value)) return true;
     const direct = hostAttr(h, model, t.field, t.value);
     if (direct !== undefined) return direct;
     return (incident.get(h.id) ?? []).some((e) => edgeAttr(e, t.field, t.value)) || h.listening.some((l) => listenAttr(l, t.field, t.value));
@@ -101,7 +108,7 @@ export function applyFilter(model, terms) {
     if (own !== undefined) return own;
     const ends = [model.hosts.get(e.source), model.hosts.get(e.target)];
     const viaHost = ends.some((h) => hostAttr(h, model, t.field, t.value));
-    return t.field === null ? viaHost || has(e.name, t.value) || String(e.port) === t.value : viaHost;
+    return t.field === null ? viaHost || has(e.name, t.value) || String(e.port) === t.value || edgeAttr(e, "process", t.value) : viaHost;
   };
 
   const hosts = new Set(), edges = new Set();

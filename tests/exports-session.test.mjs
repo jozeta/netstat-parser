@@ -24,7 +24,7 @@ const m = buildModel([ws], DEFAULT_SETTINGS);
 
 test("CSV headers and row counts", () => {
   const c = connectionsCsv(m).trimEnd().split("\n");
-  assert.equal(c[0], "source_host,source_ip,destination_host,destination_ip,port,proto,protocol,risk,states,seen,source_files");
+  assert.equal(c[0], "source_host,source_ip,destination_host,destination_ip,port,proto,protocol,risk,states,seen,source_files,source_process,destination_process");
   assert.equal(c.length - 1, m.edges.size);
   assert.ok(c.some((l) => l.startsWith("WS-1,10.10.10.21,10.10.1.10,10.10.1.10,445,tcp,SMB,exploitable,ESTABLISHED,one,WS-1_netstat.txt")), c.join("\n"));
   const h = hostsCsv(m).trimEnd().split("\n");

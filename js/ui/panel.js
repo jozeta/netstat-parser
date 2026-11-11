@@ -39,7 +39,48 @@ function resolveBlock(h, dns, resolve) {
     el("span", { class: "lg-small lg-muted", id: "resolve-one-hint" }, status));
 }
 
-export function hostDetails({ model, host: h, dns, onPick, resolve = null }) {
+/**
+ * "Can this host be reached from that one?" Start a path on one host, find it from another.
+ * @param {object} h host
+ * @param {{startLabel: string|null, isStart: boolean, onStart: Function, onCancel: Function, onFind: Function,
+ *   onClear: Function, result: object|null}|null} path
+ */
+function pathBlock(h, path, onPick) {
+  if (!path) return null;
+  const box = (id, label, checked) => {
+    const i = el("input", { type: "checkbox", id });
+    i.checked = checked;
+    return [i, el("label", { class: "np-inline lg-small", for: id }, i, label)];
+  };
+  if (!path.startLabel || path.isStart) {
+    return el("div", { class: "np-path" },
+      title("Path"),
+      path.isStart
+        ? el("p", { class: "lg-small lg-muted" }, "Paths start here. Select another host and choose Find path.")
+        : el("p", { class: "lg-small lg-muted" }, "Which hosts lead from here to another one, using the connections in the files?"),
+      path.isStart
+        ? el("button", { class: "lg-btn", type: "button", onclick: path.onCancel }, "Cancel path")
+        : el("button", { class: "lg-btn", type: "button", id: "path-start", onclick: path.onStart }, "Start a path here"));
+  }
+  const r = path.result;
+  const [risky, riskyLabel] = box("path-risky", "Only red and orange connections", r?.riskyOnly ?? false);
+  const [directed, directedLabel] = box("path-directed", "Only in the direction the connections were made", r?.directed ?? true);
+  return el("div", { class: "np-path" },
+    title("Path"),
+    el("p", { class: "lg-small" }, `From ${path.startLabel} to this host.`),
+    riskyLabel, directedLabel,
+    el("div", { class: "lg-row" },
+      el("button", { class: "lg-btn lg-btn-primary", type: "button", id: "path-find",
+        onclick: () => path.onFind({ riskyOnly: risky.checked, directed: directed.checked }) }, "Find path"),
+      r ? el("button", { class: "lg-btn", type: "button", onclick: path.onClear }, "Clear path") : null,
+      el("button", { class: "lg-btn lg-btn-ghost", type: "button", onclick: path.onStart }, "Start here instead")),
+    r ? el("ol", { class: "np-list np-path-steps", "aria-label": "Path" }, r.steps.map((st) =>
+      el("li", null, el("button", { class: "lg-btn lg-btn-ghost", type: "button", onclick: () => onPick(st.edge.id) },
+        el("span", null, `${st.from} ${st.forward ? "→" : "←"} ${st.to}`),
+        badge(portName(st.edge.port, st.edge.proto, st.edge.name), st.edge.risk))))) : null);
+}
+
+export function hostDetails({ model, host: h, dns, onPick, resolve = null, path = null }) {
   const g = model.groups.get(h.groupId);
   const edges = [...model.edges.values()].filter((e) => e.source === h.id || e.target === h.id);
   const name = h.ips.map((ip) => dns[ip]).find(Boolean);
@@ -50,6 +91,7 @@ export function hostDetails({ model, host: h, dns, onPick, resolve = null }) {
     kv([["IP addresses", h.ips.join(", ") || "—"], ["DNS name", name ?? null], ["OS", OS_TEXT[h.os] ?? h.os], ["OS detail", h.osDetail],
       ["Role", ROLE_TEXT[h.role]], ["Subnet", g ? `${g.name}${g.cidr && g.cidr !== g.name ? ` (${g.cidr})` : ""}` : null]]),
     resolveBlock(h, dns, resolve),
+    pathBlock(h, path, onPick),
     h.warnings.length ? el("ul", { class: "np-warning lg-small" }, h.warnings.map((w) => el("li", null, w))) : null,
     title(`Listening (${h.listening.length})`),
     h.listening.length
