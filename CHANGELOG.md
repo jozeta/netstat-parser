@@ -6,9 +6,19 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## 0.2.2 (2026-11-12)
 
+Fixes from the first collection over real SSH (Debian with `ss`, Debian with only net-tools,
+Alpine/busybox; collector also run on Python 3.9).
+
+- Linux collect command and collector: without `ip`, the header's addresses come from `ifconfig`
+  (net-tools and busybox formats). Before, such machines had an empty `addresses:` line.
+- Header: an IPv4 prefix may be a netmask (`10.0.5.12/255.255.255.0`); a non-contiguous mask
+  keeps the address without a prefix.
+- Groups: an address with no prefix of its own joins the most specific subnet another header
+  reported (/16 or narrower, /48 for IPv6) before falling back to /24 or /64. Before, one Docker
+  network showed up as both 172.18.0.0/16 and 172.18.0.0/24.
 - README: corrected two lines that said the job is never saved in the browser. By default it is
   kept in this browser's IndexedDB so a reload keeps it; turning off "Keep the current job in this
-  browser" deletes the kept copy. Documentation only; the app's behaviour is unchanged.
+  browser" deletes the kept copy.
 
 ## 0.2.1 (2026-11-11)
 

@@ -118,6 +118,10 @@ addresses: 10.0.5.12/24, fe80::1c2a:3bff:fe4d:12/64
 <raw netstat / ss output>
 ```
 
+An IPv4 prefix may also be written as a netmask (`10.0.5.12/255.255.255.0`): Linux machines
+without `ip` fall back to `ifconfig`, which prints netmasks. A non-contiguous mask keeps the
+address without a prefix.
+
 The exact command lines per OS are designed by the builder; requirements: Linux `netstat` and
 macOS `netstat` must be run with `-W` (wide), because without it they truncate long IPv6 addresses
 (net-tools silently yields a different valid address; the Linux parser warns via
@@ -150,7 +154,10 @@ added to it.
 - **Groups (compound nodes)**
   - Private/internal addresses (RFC1918, link-local, ULA, CGNAT 100.64/10, plus any ranges
     configured in Settings) are grouped by subnet. Subnet = the configured range if one matches,
-    else the prefix from the header `addresses`, else a default /24 (IPv4) or /64 (IPv6).
+    else the prefix from the header `addresses`, else the most specific subnet that any header
+    reported and that contains the address (only reported subnets of /16 or narrower, /48 for
+    IPv6, so one host with a wide netmask cannot swallow a network), else a default /24 (IPv4) or
+    /64 (IPv6).
   - Everything else goes into one **Internet** cloud node.
   - A group starts **expanded** if it has at most N hosts (Settings, default **30**; owner decision
     2026-11-11) and **collapsed** otherwise. The rule applies to groups that appear for the first

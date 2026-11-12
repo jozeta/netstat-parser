@@ -73,6 +73,8 @@ SMB and pass-the-hash are deliberately not supported.
 npm run test:collector    # or: python3 -m unittest discover -s collector/tests -t collector
 ```
 
-Remote execution is mocked. Real-machine status (2026-11-11): the POSIX script was run on macOS,
-and the ssh path only up to a refused connection. A full SSH collection from Linux or macOS and
-the WinRM path with the Windows script are not yet verified on real targets.
+Remote execution is mocked. Real-machine status (2026-11-12): full SSH collections ran against
+Linux containers (Debian 12 with `ss` and `ip`, Debian 12 with only net-tools, Alpine 3.20 with
+busybox and no `ip`), with the collector on macOS and on Python 3.9. Unknown host keys are refused
+without `--accept-new-hostkeys`. The POSIX script also ran locally on macOS. Not yet verified on
+real targets: SSH to a macOS machine, and the WinRM path with the Windows script.

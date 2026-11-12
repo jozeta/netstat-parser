@@ -26,16 +26,25 @@ offline instead, see [Getting started](#getting-started).
 
 All screenshots use the synthetic test networks (`npm run gen:data`), never real data.
 
-**Version 0.2.2** (2026-11-12), a documentation fix on top of 0.2.1's bug fixes. The web app
-and the collector script are usable; the collector's WinRM path and the collect commands have not
-yet been tried on real Windows and Linux machines. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
+**Version 0.2.2** (2026-11-12), fixes from the first collection over real SSH. The web app and
+the collector script are usable. The collector and the Linux collect command have been run over
+SSH against real Debian (with and without `ss`/`ip`) and Alpine (busybox) machines, with the
+collector on Python 3.9 and newer; the WinRM path and the Windows and macOS commands have not yet
+been tried on real machines. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
 The version is shown in the menu (top right) and by `python3 collector/collect.py --version`.
 
 ## What's new in 0.2.2
 
+- **Subnets on machines without `ip`:** the Linux collect command (and the collector) falls back
+  to `ifconfig` for the header's addresses, so older or minimal Linux machines with only net-tools
+  or busybox no longer arrive without addresses. The app reads netmasks such as
+  `10.0.5.12/255.255.255.0`.
+- **One subnet, one group:** a host whose file gives no prefix (and a host seen only in others'
+  files) now joins a subnet that another host's header reported, instead of a guessed /24 beside
+  it. Reported subnets wider than /16 are not used for this.
 - **README corrected:** it said the job is never saved in the browser, but by default it is (in
   IndexedDB, so a reload keeps it). The README now says so, and how to turn it off and delete the
-  kept copy. Nothing in the app changed.
+  kept copy.
 
 ### 0.2.1 (2026-11-11)
 

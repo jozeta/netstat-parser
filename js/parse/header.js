@@ -18,13 +18,22 @@ export function cleanText(s, max) {
   return String(s).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "").trim().slice(0, max).trim();
 }
 
+/** "255.255.0.0" → 16; null for a non-contiguous or invalid mask. */
+function maskPrefix(mask) {
+  const parts = mask.split(".").map(Number);
+  if (parts.some((p) => p > 255)) return null;
+  const bits = parts.map((p) => p.toString(2).padStart(8, "0")).join("");
+  return /^1*0*$/.test(bits) ? bits.indexOf("0") === -1 ? 32 : bits.indexOf("0") : null;
+}
+
 function parseAddresses(value) {
   const out = [];
   for (const part of value.split(",")) {
-    const m = /^\s*([^/\s]+)(?:\/(\d{1,3}))?\s*$/.exec(part);
+    // "10.0.0.5/24", or "10.0.0.5/255.255.255.0" (ifconfig's netmask, where there is no `ip`)
+    const m = /^\s*([^/\s]+)(?:\/(\d{1,3}(?:\.\d{1,3}){3}|\d{1,3}))?\s*$/.exec(part);
     if (!m) continue;
     const ip = normalizeIp(m[1]);
-    const prefix = m[2] === undefined ? null : Number(m[2]);
+    const prefix = m[2] === undefined ? null : m[2].includes(".") ? maskPrefix(m[2]) : Number(m[2]);
     if (!ip || ip.ip === "*" || (prefix !== null && prefix > (ip.family === 4 ? 32 : 128))) continue;
     out.push({ ip: ip.ip, prefix });
   }

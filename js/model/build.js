@@ -143,6 +143,12 @@ export function buildModel(files, settings) {
 
   // ---- groups ----
   const groups = new Map();
+  // subnets that headers reported (no wider than /16, or /48 for IPv6, so one host with a wide
+  // netmask cannot pull a whole network into one group), most specific first: an address with no
+  // prefix of its own joins one of these before falling back to a guessed /24 or /64
+  const reported = [...new Set([...prefixHint].filter(([ip, p]) => p >= (ip.includes(":") ? 48 : 16)).map(([ip, p]) => networkOf(ip, p)))]
+    .map(parseCidr).sort((a, b) => b.prefix - a.prefix || (a.ip < b.ip ? -1 : a.ip > b.ip ? 1 : 0));
+  const guessPrefix = (ip) => reported.find((c) => inCidr(ip, c))?.prefix ?? (ip.includes(":") ? 64 : 24);
   const groupFor = (h) => {
     const primary = primaryOf.get(h.id) ?? h.ips.find((ip) => !isLinkLocal(ip) && !ip.includes(":")) ?? h.ips.find((ip) => !isLinkLocal(ip)) ?? h.ips[0];
     if (!primary) return { id: "g:none", kind: "subnet", cidr: null, name: "No address" };
@@ -152,7 +158,7 @@ export function buildModel(files, settings) {
       const cidr = `${hit.cidr.ip}/${hit.cidr.prefix}`;
       return { id: `g:${cidr}`, kind: "subnet", cidr, name: hit.name || cidr };
     }
-    const cidr = networkOf(primary, prefixHint.get(primary) ?? (primary.includes(":") ? 64 : 24));
+    const cidr = networkOf(primary, prefixHint.get(primary) ?? guessPrefix(primary));
     return { id: `g:${cidr}`, kind: "subnet", cidr, name: cidr };
   };
   for (const h of hosts.values()) {

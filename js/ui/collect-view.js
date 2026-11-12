@@ -29,7 +29,7 @@ $ips = (Get-NetIPAddress | Where-Object { $_.IPAddress -notmatch '^(127\\.|::1$)
   echo "hostname: $h"
   echo "os: $( [ -r /etc/os-release ] && . /etc/os-release && echo "$PRETTY_NAME" || uname -sr)"
   echo "collected: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "addresses: $(ip -o addr show 2>/dev/null | awk '$4 !~ /^(127\\.|::1)/ {print $4}' | paste -sd, - | sed 's/,/, /g')"
+  echo "addresses: $(if command -v ip >/dev/null 2>&1; then ip -o addr show 2>/dev/null | awk '$4 !~ /^(127\\.|::1)/ {print $4}'; else ifconfig 2>/dev/null | awk '$1=="inet" || $1=="inet6" {a=$2; if (a=="addr:") a=$3; sub(/^addr:/, "", a); m=""; for (i=3; i<=NF; i++) { if ($i=="netmask" || $i=="prefixlen") m="/" $(i+1); else if ($i ~ /^Mask:/) m="/" substr($i, 6) } if (a !~ /^(127\\.|::1(\\/|$)|fe80:)/) print a m}'; fi | paste -sd, - | sed 's/,/, /g')"
   echo "### netstat"
   if command -v ss >/dev/null 2>&1; then ss -tunap; else netstat -tunapW; fi
 } > "\${h}_netstat.txt"`,
