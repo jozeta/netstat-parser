@@ -4,6 +4,12 @@ All notable changes to netstat-parser are listed here, newest first.
 
 ## Unreleased
 
+## 0.2.2 (2026-11-12)
+
+- README: corrected two lines that said the job is never saved in the browser. By default it is
+  kept in this browser's IndexedDB so a reload keeps it; turning off "Keep the current job in this
+  browser" deletes the kept copy. Documentation only; the app's behaviour is unchanged.
+
 ## 0.2.1 (2026-11-11)
 
 Bug fixes from a full code review (32 issues).

@@ -26,12 +26,18 @@ offline instead, see [Getting started](#getting-started).
 
 All screenshots use the synthetic test networks (`npm run gen:data`), never real data.
 
-**Version 0.2.1** (2026-11-11), a bug-fix release after the first public one (0.2.0). The web app
+**Version 0.2.2** (2026-11-12), a documentation fix on top of 0.2.1's bug fixes. The web app
 and the collector script are usable; the collector's WinRM path and the collect commands have not
 yet been tried on real Windows and Linux machines. Design: [docs/superpowers/specs/2026-11-10-netstat-parser-design.md](docs/superpowers/specs/2026-11-10-netstat-parser-design.md).
 The version is shown in the menu (top right) and by `python3 collector/collect.py --version`.
 
-## What's new in 0.2.1
+## What's new in 0.2.2
+
+- **README corrected:** it said the job is never saved in the browser, but by default it is (in
+  IndexedDB, so a reload keeps it). The README now says so, and how to turn it off and delete the
+  kept copy. Nothing in the app changed.
+
+### 0.2.1 (2026-11-11)
 
 - **Privacy:** DNS lookup no longer sends private addresses written in IPv6 form (such as
   `::10.0.0.5`) or other reserved ranges; your named subnets stay protected after opening a
@@ -97,7 +103,10 @@ Full list: [CHANGELOG.md](CHANGELOG.md).
   your machine. It only runs read-only commands and has a dry-run mode. See
   [collector/README.md](collector/README.md).
 
-Job data is only kept in sessions you export yourself. The app does not auto-save it in the browser.
+Job data stays on your machine: in memory, in sessions you export yourself, and (unless you turn
+off "Keep the current job in this browser") in this browser's IndexedDB so a reload keeps it. It
+is never uploaded. On a shared computer, turn that setting off when you finish: that also deletes
+the kept copy.
 
 ## Getting started
 
@@ -113,7 +122,8 @@ python3 -m http.server 8580      # then open http://localhost:8580/ (or: claude-
    asks whether to add them to the current job or start a new one (the default is a setting).
 3. Click hosts, groups or lines for details; search with `port:445 risk:red`, `collected:no`,
    `seen:one` and so on; name your subnets and tune the protocol risk table in **Settings**.
-4. **Export → Session** saves the job to reopen later (nothing is saved automatically).
+4. **Export → Session** saves the job to a file you can reopen later or on another machine. (The
+   browser also keeps the current job across a reload; see **Settings** to turn that off.)
 
 Many machines at once: export **Collector targets** from the graph, fill in users, then run
 `python3 collector/collect.py targets.txt --dry-run` and without `--dry-run` to collect.
